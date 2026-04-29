@@ -37,3 +37,8 @@
 - The 90s stop was coming from the automation default, not the real game loop.
 - Raised the default automation max run time to 300s so balance tests can reach the second boss and beyond.
 - Boss scheduling is now stateful: first boss at 60s, second boss at 120s, later boss fights resume on a delay after that.
+
+## Pass 8
+- Player volleys need a center line, otherwise even-sized spreads can miss the target too often.
+- Updated the shot builder so odd counts stay symmetric and even counts include a duplicated center shot.
+- Keep the center projectile invariant unless a later balance pass explicitly changes the weapon model.

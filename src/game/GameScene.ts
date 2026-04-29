@@ -326,15 +326,15 @@ export class GameScene extends Phaser.Scene {
     this.shootAt = this.elapsedMs + this.stats.fireRate * this.debug.playerFireRateMultiplier;
     const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, target.x, target.y);
     const spread = 0.17;
-    const start = -((this.stats.projectiles - 1) * spread) / 2;
+    const shots = this.getPlayerShotAngles(angle, spread);
 
-    for (let i = 0; i < this.stats.projectiles; i += 1) {
+    for (const shotAngle of shots) {
       firePlayerShot(
         this,
         this.playerShots,
         this.player.x,
         this.player.y,
-        angle + start + i * spread,
+        shotAngle,
         this.getScaledPlayerDamage(),
         this.stats.projectileSpeed,
         this.stats.pierce,
@@ -342,6 +342,22 @@ export class GameScene extends Phaser.Scene {
       );
     }
     playSound("shoot");
+  }
+
+  private getPlayerShotAngles(baseAngle: number, spread: number): number[] {
+    const count = Math.max(1, this.stats.projectiles);
+    if (count % 2 === 1) {
+      const half = (count - 1) / 2;
+      return Array.from({ length: count }, (_, index) => baseAngle + (index - half) * spread);
+    }
+
+    const shots = [baseAngle, baseAngle];
+    const pairs = Math.max(0, (count - 2) / 2);
+    for (let i = 1; i <= pairs; i += 1) {
+      shots.unshift(baseAngle - i * spread);
+      shots.push(baseAngle + i * spread);
+    }
+    return shots;
   }
 
   private onShotHitsEnemy(shotObject: object, enemyObject: object) {
