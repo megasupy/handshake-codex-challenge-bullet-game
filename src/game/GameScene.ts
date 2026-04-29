@@ -21,6 +21,7 @@ export class GameScene extends Phaser.Scene {
   private playerBody!: Phaser.Physics.Arcade.Body;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
+  private dashQueued = false;
   private enemies!: Phaser.Physics.Arcade.Group;
   private playerShots!: Phaser.Physics.Arcade.Group;
   private enemyBullets!: Phaser.Physics.Arcade.Group;
@@ -230,7 +231,13 @@ export class GameScene extends Phaser.Scene {
 
   private createInput() {
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = this.input.keyboard!.addKeys("W,A,S,D,SPACE,ESC") as Record<string, Phaser.Input.Keyboard.Key>;
+    this.wasd = this.input.keyboard!.addKeys("W,A,S,D,SPACE,SHIFT,ESC") as Record<string, Phaser.Input.Keyboard.Key>;
+    this.input.keyboard!.on("keydown-SPACE", () => {
+      this.dashQueued = true;
+    });
+    this.input.keyboard!.on("keydown-SHIFT", () => {
+      this.dashQueued = true;
+    });
   }
 
   private createCollisions() {
@@ -305,7 +312,7 @@ export class GameScene extends Phaser.Scene {
   private shouldDash(direction: Phaser.Math.Vector2) {
     if (this.elapsedMs < this.dashAt) return false;
     if (!this.debug.autoplayer) {
-      if (!Phaser.Input.Keyboard.JustDown(this.wasd.SPACE)) return false;
+      if (!this.dashQueued) return false;
       return direction.lengthSq() > 0 || this.lastManualDirection.lengthSq() > 0;
     }
     if (direction.lengthSq() === 0) return false;
@@ -320,6 +327,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private startDash(direction: Phaser.Math.Vector2) {
+    this.dashQueued = false;
     if (!this.debug.autoplayer && direction.lengthSq() === 0) this.dashVector.copy(this.lastManualDirection);
     else this.dashVector.copy(direction);
     this.dashUntil = this.elapsedMs + 155;
