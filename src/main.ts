@@ -83,6 +83,9 @@ const telemetryArchiveList = mustGet("telemetry-archive-list");
 const telemetryArchiveCopy = mustGetButton("telemetry-archive-copy");
 const telemetryArchiveDownload = mustGetButton("telemetry-archive-download");
 const telemetryArchiveClear = mustGetButton("telemetry-archive-clear");
+const telemetryTimelineCount = mustGet("telemetry-timeline-count");
+const telemetryTimelineSummary = mustGet("telemetry-timeline-summary");
+const telemetryTimelineList = mustGet("telemetry-timeline-list");
 const profileBackup = mustGet("profile-backup") as HTMLTextAreaElement;
 const profileBackupExport = mustGetButton("profile-backup-export");
 const profileBackupImport = mustGetButton("profile-backup-import");
@@ -387,6 +390,7 @@ gameEvents.addEventListener("automation-complete", (event) => {
   if (!automationConfig.active || !detail.run) return;
   currentTelemetryArchive = saveTelemetryRun(detail.run);
   renderTelemetryArchive();
+  renderTelemetryTimeline();
   publishAutomationResult(detail.run, true);
 });
 
@@ -401,6 +405,7 @@ renderProgressionPanel();
 renderRecordsPanel();
 renderRecentRunsPanel();
 renderAchievementsPanel();
+renderTelemetryTimeline();
 refreshCheckpointUi();
 renderTelemetryArchive();
 profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
@@ -835,6 +840,40 @@ function renderTelemetryArchive() {
   });
 }
 
+function renderTelemetryTimeline() {
+  const entry = currentTelemetryArchive[0];
+  if (!entry) {
+    telemetryTimelineCount.textContent = "0 lines";
+    telemetryTimelineSummary.textContent = "The latest telemetry run is summarized into readable snapshots.";
+    telemetryTimelineList.innerHTML = `<li class="rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400">No telemetry timeline yet.</li>`;
+    return;
+  }
+
+  const lines = entry.logText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.includes("SNAP") || line.includes("EVENT"));
+  const slice = lines.slice(-6);
+  telemetryTimelineCount.textContent = `${slice.length} lines`;
+  telemetryTimelineSummary.textContent = `Latest run: ${formatTelemetryArchiveEntry(entry)}`;
+  telemetryTimelineList.innerHTML = "";
+
+  if (slice.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
+    empty.textContent = "Telemetry run has no readable snapshots yet.";
+    telemetryTimelineList.append(empty);
+    return;
+  }
+
+  for (const line of slice) {
+    const item = document.createElement("li");
+    item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-xs leading-5 text-slate-300";
+    item.textContent = line;
+    telemetryTimelineList.append(item);
+  }
+}
+
 function shouldAutoPause(): boolean {
   if (!getGameScene() || runPaused) return false;
   if (upgradeScreen.classList.contains("hidden") === false || tutorialScreen.classList.contains("hidden") === false || gameOver.classList.contains("hidden") === false || menu.classList.contains("hidden") === false) {
@@ -857,6 +896,7 @@ function syncProfileFromStorage() {
   renderRecordsPanel();
   renderRecentRunsPanel();
   renderAchievementsPanel();
+  renderTelemetryTimeline();
   renderTelemetryArchive();
   refreshTutorialUi();
   renderKeybindsPanel();
