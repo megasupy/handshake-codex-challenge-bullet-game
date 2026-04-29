@@ -6,6 +6,7 @@ export type PreferencesState = {
   screenShake: boolean;
   screenShakeStrength: number;
   reducedMotion: boolean;
+  highContrast: boolean;
 };
 
 function defaultPreferences(): PreferencesState {
@@ -15,6 +16,7 @@ function defaultPreferences(): PreferencesState {
     screenShake: true,
     screenShakeStrength: 1,
     reducedMotion: false,
+    highContrast: false,
   };
 }
 
@@ -49,6 +51,7 @@ export function formatPreferencesSummary(state: PreferencesState): string {
     state.screenShake ? "Shake on" : "Shake off",
     state.screenShake ? `Strength ${state.screenShakeStrength.toFixed(1)}x` : "No shake",
     state.reducedMotion ? "Reduced motion" : "Full motion",
+    state.highContrast ? "High contrast" : "Standard colors",
   ];
   return parts.join(" · ");
 }
@@ -61,6 +64,7 @@ function normalizePreferences(input: Partial<PreferencesState>): PreferencesStat
     screenShake: input.screenShake ?? base.screenShake,
     screenShakeStrength: clampRange(input.screenShakeStrength ?? base.screenShakeStrength, 0.25, 2),
     reducedMotion: input.reducedMotion ?? base.reducedMotion,
+    highContrast: input.highContrast ?? base.highContrast,
   };
 }
 

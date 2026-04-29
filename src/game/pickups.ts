@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import type { PlayerStats } from "./gameTypes";
+import { getVisualPalette } from "./palette";
 
 export type SerializedPickupState = {
   x: number;
@@ -34,7 +35,7 @@ export function restorePickup(
   pickups: Phaser.Physics.Arcade.Group,
   state: SerializedPickupState,
 ): void {
-  const pickup = scene.physics.add.image(state.x, state.y, "pickup");
+  const pickup = scene.physics.add.image(state.x, state.y, getVisualPalette().highContrast ? "pickup-hc" : "pickup");
   const body = pickup.body as Phaser.Physics.Arcade.Body;
   body.setCircle(5).setAllowGravity(false).setDrag(260, 260).setVelocity(state.vx, state.vy);
   pickup.setData("value", state.value);

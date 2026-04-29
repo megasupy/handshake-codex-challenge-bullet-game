@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { readPreferences } from "../services/preferences";
+import { getVisualPalette } from "./palette";
 
 type FillShape = Phaser.GameObjects.Shape & { fillColor?: number; setFillStyle: (color: number, alpha?: number) => unknown };
 type BossRenderable = Phaser.GameObjects.Shape | Phaser.Physics.Arcade.Image;
@@ -61,10 +62,11 @@ export function enemyDeathBurst(scene: Phaser.Scene, x: number, y: number, color
 export function playerHitBurst(scene: Phaser.Scene, player: Phaser.GameObjects.Shape): void {
   const prefs = readPreferences();
   if (prefs.screenShake) scene.cameras.main.flash(prefs.reducedMotion ? 40 : 90, 251, 113, 133, false);
+  const palette = getVisualPalette();
   const count = prefs.reducedMotion ? 6 : 12;
   for (let i = 0; i < count; i += 1) {
     const angle = (Math.PI * 2 * i) / count;
-    const spark = scene.add.circle(player.x, player.y, 3, 0xfb7185, 0.9);
+    const spark = scene.add.circle(player.x, player.y, 3, palette.hitSpark, 0.9);
     scene.tweens.add({
       targets: spark,
       x: player.x + Math.cos(angle) * 48,
@@ -80,7 +82,7 @@ export function playerHitBurst(scene: Phaser.Scene, player: Phaser.GameObjects.S
 export function dashTrail(scene: Phaser.Scene, player: Phaser.GameObjects.Shape): void {
   const prefs = readPreferences();
   if (prefs.reducedMotion) return;
-  const trail = scene.add.rectangle(player.x, player.y, 26, 26, 0x5eead4, 0.22);
+  const trail = scene.add.rectangle(player.x, player.y, 26, 26, getVisualPalette().dashTrail, 0.22);
   trail.setRotation(player.rotation);
   scene.tweens.add({
     targets: trail,

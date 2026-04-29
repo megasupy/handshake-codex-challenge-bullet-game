@@ -16,25 +16,25 @@ export const SETTINGS_PRESETS: SettingsPreset[] = [
     id: "balanced",
     title: "Balanced",
     description: "Comfortable defaults for normal play.",
-    settings: { soundVolume: 1, screenShake: true, screenShakeStrength: 1, reducedMotion: false },
+    settings: { soundVolume: 1, screenShake: true, screenShakeStrength: 1, reducedMotion: false, highContrast: false },
   },
   {
     id: "focus",
     title: "Focus",
     description: "Lower noise and reduced motion.",
-    settings: { soundVolume: 0.7, screenShake: false, screenShakeStrength: 0.5, reducedMotion: true },
+    settings: { soundVolume: 0.7, screenShake: false, screenShakeStrength: 0.5, reducedMotion: true, highContrast: true },
   },
   {
     id: "silent",
     title: "Silent",
     description: "Muted with minimal motion.",
-    settings: { soundVolume: 0, screenShake: false, screenShakeStrength: 0.25, reducedMotion: true },
+    settings: { soundVolume: 0, screenShake: false, screenShakeStrength: 0.25, reducedMotion: true, highContrast: true },
   },
   {
     id: "full-juice",
     title: "Full Juice",
     description: "Loud and energetic presentation.",
-    settings: { soundVolume: 1, screenShake: true, screenShakeStrength: 1.5, reducedMotion: false },
+    settings: { soundVolume: 1, screenShake: true, screenShakeStrength: 1.5, reducedMotion: false, highContrast: false },
   },
 ];
 
@@ -66,7 +66,7 @@ export function applySettingsPreset(id: Exclude<SettingsPresetId, "custom">): Pr
 
 export function formatSettingsPresetSummary(id: SettingsPresetId, preferences: PreferencesState): string {
   if (id === "custom") {
-    return `Custom · Sound ${Math.round(preferences.soundVolume * 100)}% · ${preferences.screenShake ? "Shake on" : "Shake off"} · ${preferences.reducedMotion ? "Reduced motion" : "Full motion"}`;
+    return `Custom · Sound ${Math.round(preferences.soundVolume * 100)}% · ${preferences.screenShake ? "Shake on" : "Shake off"} · ${preferences.reducedMotion ? "Reduced motion" : "Full motion"} · ${preferences.highContrast ? "High contrast" : "Standard colors"}`;
   }
 
   const preset = SETTINGS_PRESETS.find((entry) => entry.id === id);

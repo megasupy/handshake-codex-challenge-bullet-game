@@ -1,39 +1,49 @@
 import Phaser from "phaser";
 import { ARENA_HEIGHT, ARENA_WIDTH, ENEMY_BULLET_RADIUS, PLAYER_BULLET_RADIUS } from "./constants";
+import { buildVisualPalette, getVisualPalette } from "./palette";
 
 export function createArenaBackground(scene: Phaser.Scene): void {
-  scene.cameras.main.setBackgroundColor("#07090f");
+  const palette = getVisualPalette();
+  scene.cameras.main.setBackgroundColor(palette.background);
   const grid = scene.add.graphics();
-  grid.lineStyle(1, 0x243044, 0.38);
+  grid.lineStyle(1, palette.grid, 0.38);
   for (let x = 0; x <= ARENA_WIDTH; x += 64) grid.lineBetween(x, 0, x, ARENA_HEIGHT);
   for (let y = 0; y <= ARENA_HEIGHT; y += 64) grid.lineBetween(0, y, ARENA_WIDTH, y);
 
-  scene.add.rectangle(ARENA_WIDTH / 2, ARENA_HEIGHT / 2, ARENA_WIDTH - 36, ARENA_HEIGHT - 36).setStrokeStyle(2, 0x334155, 0.9);
+  scene.add.rectangle(ARENA_WIDTH / 2, ARENA_HEIGHT / 2, ARENA_WIDTH - 36, ARENA_HEIGHT - 36).setStrokeStyle(2, palette.arenaBorder, 0.9);
 }
 
 export function createGameTextures(scene: Phaser.Scene): void {
-  makeCircleTexture(scene, "player-shot", PLAYER_BULLET_RADIUS, 0xfacc15);
-  makeEnemyBulletTextures(scene);
-  makeCircleTexture(scene, "pickup", 7, 0x22c55e);
-  makeBossTexture(scene);
+  const defaultPalette = buildVisualPalette(false);
+  const highContrastPalette = buildVisualPalette(true);
+  makeCircleTexture(scene, "player-shot", PLAYER_BULLET_RADIUS, defaultPalette.playerShot, defaultPalette.playerShotInner);
+  makeCircleTexture(scene, "player-shot-hc", PLAYER_BULLET_RADIUS, highContrastPalette.playerShot, highContrastPalette.playerShotInner);
+  makeEnemyBulletTextures(scene, defaultPalette, "");
+  makeEnemyBulletTextures(scene, highContrastPalette, "-hc");
+  makeCircleTexture(scene, "pickup", 7, defaultPalette.pickup);
+  makeCircleTexture(scene, "pickup-hc", 7, highContrastPalette.pickup);
+  makeBossTexture(scene, defaultPalette, "");
+  makeBossTexture(scene, highContrastPalette, "-hc");
 }
 
-function makeEnemyBulletTextures(scene: Phaser.Scene): void {
-  if (!scene.textures.exists("enemy-bullet-circle")) {
+function makeEnemyBulletTextures(scene: Phaser.Scene, palette = buildVisualPalette(false), suffix = ""): void {
+  const circleKey = `enemy-bullet-circle${suffix}`;
+  if (!scene.textures.exists(circleKey)) {
     const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
-    graphics.fillStyle(0xdc2626, 1);
+    graphics.fillStyle(palette.enemyBullet, 1);
     graphics.fillCircle(ENEMY_BULLET_RADIUS, ENEMY_BULLET_RADIUS, ENEMY_BULLET_RADIUS);
-    graphics.fillStyle(0xffffff, 1);
+    graphics.fillStyle(palette.enemyBulletInner, 1);
     graphics.fillCircle(ENEMY_BULLET_RADIUS, ENEMY_BULLET_RADIUS, Math.max(3, ENEMY_BULLET_RADIUS * 0.42));
-    graphics.generateTexture("enemy-bullet-circle", ENEMY_BULLET_RADIUS * 2, ENEMY_BULLET_RADIUS * 2);
+    graphics.generateTexture(circleKey, ENEMY_BULLET_RADIUS * 2, ENEMY_BULLET_RADIUS * 2);
     graphics.destroy();
   }
 
-  if (!scene.textures.exists("enemy-bullet-diamond")) {
+  const diamondKey = `enemy-bullet-diamond${suffix}`;
+  if (!scene.textures.exists(diamondKey)) {
     const size = ENEMY_BULLET_RADIUS * 2.5;
     const mid = size / 2;
     const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
-    graphics.fillStyle(0xdc2626, 1);
+    graphics.fillStyle(palette.enemyBullet, 1);
     graphics.beginPath();
     graphics.moveTo(mid, 0);
     graphics.lineTo(size, mid);
@@ -41,17 +51,18 @@ function makeEnemyBulletTextures(scene: Phaser.Scene): void {
     graphics.lineTo(0, mid);
     graphics.closePath();
     graphics.fillPath();
-    graphics.fillStyle(0xffffff, 1);
+    graphics.fillStyle(palette.enemyBulletInner, 1);
     graphics.fillCircle(mid, mid, ENEMY_BULLET_RADIUS * 0.38);
-    graphics.generateTexture("enemy-bullet-diamond", size, size);
+    graphics.generateTexture(diamondKey, size, size);
     graphics.destroy();
   }
 
-  if (!scene.textures.exists("enemy-bullet-arrow")) {
+  const arrowKey = `enemy-bullet-arrow${suffix}`;
+  if (!scene.textures.exists(arrowKey)) {
     const width = ENEMY_BULLET_RADIUS * 3.2;
     const height = ENEMY_BULLET_RADIUS * 2;
     const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
-    graphics.fillStyle(0xdc2626, 1);
+    graphics.fillStyle(palette.enemyBullet, 1);
     graphics.beginPath();
     graphics.moveTo(width, height / 2);
     graphics.lineTo(width * 0.42, 0);
@@ -62,40 +73,45 @@ function makeEnemyBulletTextures(scene: Phaser.Scene): void {
     graphics.lineTo(width * 0.42, height);
     graphics.closePath();
     graphics.fillPath();
-    graphics.fillStyle(0xffffff, 1);
+    graphics.fillStyle(palette.enemyBulletInner, 1);
     graphics.fillCircle(width * 0.45, height / 2, ENEMY_BULLET_RADIUS * 0.34);
-    graphics.generateTexture("enemy-bullet-arrow", width, height);
+    graphics.generateTexture(arrowKey, width, height);
     graphics.destroy();
   }
 }
 
-function makeCircleTexture(scene: Phaser.Scene, key: string, radius: number, color: number): void {
+function makeCircleTexture(scene: Phaser.Scene, key: string, radius: number, color: number, innerColor?: number): void {
   if (scene.textures.exists(key)) return;
   const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
   graphics.fillStyle(color, 1);
   graphics.fillCircle(radius, radius, radius);
+  if (innerColor !== undefined) {
+    graphics.fillStyle(innerColor, 1);
+    graphics.fillCircle(radius, radius, Math.max(2, radius * 0.38));
+  }
   graphics.generateTexture(key, radius * 2, radius * 2);
   graphics.destroy();
 }
 
-function makeBossTexture(scene: Phaser.Scene): void {
-  if (scene.textures.exists("boss-core")) return;
+function makeBossTexture(scene: Phaser.Scene, palette = buildVisualPalette(false), suffix = ""): void {
+  const key = `boss-core${suffix}`;
+  if (scene.textures.exists(key)) return;
   const size = 172;
   const mid = size / 2;
   const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
-  graphics.fillStyle(0xef4444, 1);
+  graphics.fillStyle(palette.bossPhases[1][0], 1);
   graphics.fillCircle(mid, mid, 70);
-  graphics.fillStyle(0xdc2626, 1);
+  graphics.fillStyle(palette.bossPhases[1][1], 1);
   graphics.fillCircle(mid, mid, 54);
-  graphics.fillStyle(0xffffff, 1);
+  graphics.fillStyle(palette.playerShotInner, 1);
   graphics.fillCircle(mid, mid, 21);
-  graphics.lineStyle(4, 0xffffff, 0.9);
+  graphics.lineStyle(4, palette.playerShotInner, 0.9);
   graphics.strokeCircle(mid, mid, 70);
   for (let i = 0; i < 8; i += 1) {
     const angle = (Math.PI * 2 * i) / 8;
     const x = mid + Math.cos(angle) * 82;
     const y = mid + Math.sin(angle) * 82;
-    graphics.fillStyle(0xef4444, 1);
+    graphics.fillStyle(palette.bossPhases[1][2], 1);
     graphics.fillTriangle(
       x,
       y,
@@ -105,6 +121,6 @@ function makeBossTexture(scene: Phaser.Scene): void {
       y + Math.sin(angle - 0.45) * 16,
     );
   }
-  graphics.generateTexture("boss-core", size, size);
+  graphics.generateTexture(key, size, size);
   graphics.destroy();
 }

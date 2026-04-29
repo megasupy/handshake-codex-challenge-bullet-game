@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { DebugSettings } from "./events";
 import { ARENA_HEIGHT, ARENA_WIDTH, ENEMY_BULLET_RADIUS, MAX_ACTIVE_ENEMY_BULLETS, PLAYER_BULLET_RADIUS } from "./constants";
+import { getVisualPalette } from "./palette";
 
 export type SerializedPlayerShotState = {
   x: number;
@@ -35,7 +36,7 @@ export function firePlayerShot(
   pierce: number,
   debug: DebugSettings,
 ): void {
-  const shot = scene.physics.add.image(x, y, "player-shot");
+  const shot = scene.physics.add.image(x, y, getPlayerShotTexture());
   const body = shot.body as Phaser.Physics.Arcade.Body;
   const speedScale = debug.playerProjectileSpeed / 620;
   const vx = Math.cos(angle) * projectileSpeed * speedScale;
@@ -55,7 +56,7 @@ export function restorePlayerShot(
   group: Phaser.Physics.Arcade.Group,
   state: SerializedPlayerShotState,
 ): void {
-  const shot = scene.physics.add.image(state.x, state.y, "player-shot");
+  const shot = scene.physics.add.image(state.x, state.y, getPlayerShotTexture());
   const body = shot.body as Phaser.Physics.Arcade.Body;
   body.setCircle(PLAYER_BULLET_RADIUS).setAllowGravity(false).setVelocity(state.vx, state.vy);
   shot.setData("vx", state.vx);
@@ -103,7 +104,7 @@ export function restoreEnemyBullet(
   state: SerializedEnemyBulletState,
 ): void {
   if (group.countActive(true) >= MAX_ACTIVE_ENEMY_BULLETS) return;
-  const bullet = scene.physics.add.image(state.x, state.y, "enemy-bullet-circle");
+  const bullet = scene.physics.add.image(state.x, state.y, getEnemyBulletTexture(state.angle));
   const body = bullet.body as Phaser.Physics.Arcade.Body;
   const radiusScale = Phaser.Math.Clamp(state.radiusScale, 0.6, 3.2);
   const radius = ENEMY_BULLET_RADIUS * radiusScale;
@@ -119,7 +120,7 @@ export function restoreEnemyBullet(
 
 function getEnemyBulletTexture(angle: number): string {
   void angle;
-  return "enemy-bullet-circle";
+  return `${getTextureBase("enemy-bullet-circle")}`;
 }
 
 export function updateProjectiles(group: Phaser.Physics.Arcade.Group): void {
@@ -144,4 +145,12 @@ function ensureProjectileMotion(group: Phaser.Physics.Arcade.Group): void {
     projectile.setData("lastY", projectile.y);
     return true;
   });
+}
+
+function getPlayerShotTexture(): string {
+  return getTextureBase("player-shot");
+}
+
+function getTextureBase(base: string): string {
+  return getVisualPalette().highContrast ? `${base}-hc` : base;
 }

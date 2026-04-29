@@ -12,6 +12,7 @@ import { emitAutomationComplete, emitAutomationSnapshot, emitBossHud, emitDebugS
 import type { EnemyData } from "./gameTypes";
 import { magnetPickups, restorePickup } from "./pickups";
 import { firePlayerShot, restoreEnemyBullet, restorePlayerShot, updateProjectiles } from "./projectiles";
+import { getVisualPalette } from "./palette";
 import { TelemetryRecorder, toAutoplayerSample, type TelemetryConfig } from "./telemetry";
 import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpgradeOptions } from "./upgrades";
 import { applyProgression, type ProgressionState } from "../services/progression";
@@ -263,11 +264,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPlayer() {
-    this.player = this.add.rectangle(ARENA_WIDTH / 2, ARENA_HEIGHT / 2, 24, 24, 0x5eead4, 1);
-    this.player.setStrokeStyle(2, 0xffffff, 0.9);
+    const palette = getVisualPalette();
+    this.player = this.add.rectangle(ARENA_WIDTH / 2, ARENA_HEIGHT / 2, 24, 24, palette.player, 1);
+    this.player.setStrokeStyle(2, palette.playerStroke, 0.9);
     this.player.setDepth(1);
-    this.dashIndicator = this.add.rectangle(ARENA_WIDTH / 2, ARENA_HEIGHT / 2, 8, 8, 0x64748b, 1);
-    this.dashIndicator.setStrokeStyle(1, 0xffffff, 0.65);
+    this.dashIndicator = this.add.rectangle(ARENA_WIDTH / 2, ARENA_HEIGHT / 2, 8, 8, palette.dashCooldown, 1);
+    this.dashIndicator.setStrokeStyle(1, palette.playerStroke, 0.65);
     this.dashIndicator.setDepth(2);
     this.physics.add.existing(this.player);
     this.playerBody = this.player.body as Phaser.Physics.Arcade.Body;
@@ -339,6 +341,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private movePlayer(delta: number) {
+    const palette = getVisualPalette();
     const direction = this.debug.autoplayer ? this.getAutoplayerDirection() : this.getManualDirection();
     if (this.shouldDash(direction)) this.startDash(direction);
 
@@ -351,18 +354,18 @@ export class GameScene extends Phaser.Scene {
 
     const visible = this.elapsedMs > this.invulnerableUntil || Math.floor(this.elapsedMs / 70) % 2 === 0;
     this.player.setVisible(visible);
-    this.player.setFillStyle(isDashing ? 0xf8fafc : 0x5eead4);
-    this.player.setStrokeStyle(2, isDashing ? 0xfacc15 : 0xffffff, isDashing ? 1 : 0.9);
+    this.player.setFillStyle(isDashing ? palette.enemyFlash : palette.player);
+    this.player.setStrokeStyle(2, isDashing ? palette.dashActive : palette.playerStroke, isDashing ? 1 : 0.9);
     this.dashIndicator.setPosition(this.player.x, this.player.y);
     const dashReady = this.elapsedMs >= this.dashAt;
     this.dashIndicator.setVisible(visible);
     if (isDashing) {
-      this.dashIndicator.setFillStyle(0xfacc15, 1);
-      this.dashIndicator.setStrokeStyle(1, 0xffffff, 1);
+      this.dashIndicator.setFillStyle(palette.dashActive, 1);
+      this.dashIndicator.setStrokeStyle(1, palette.playerStroke, 1);
       this.dashIndicator.setAlpha(1);
     } else {
-      this.dashIndicator.setFillStyle(dashReady ? 0xfde047 : 0x475569, dashReady ? 1 : 0.9);
-      this.dashIndicator.setStrokeStyle(1, dashReady ? 0xffffff : 0x94a3b8, dashReady ? 0.9 : 0.45);
+      this.dashIndicator.setFillStyle(dashReady ? palette.dashReady : palette.dashCooldown, dashReady ? 1 : 0.9);
+      this.dashIndicator.setStrokeStyle(1, dashReady ? palette.playerStroke : 0x94a3b8, dashReady ? 0.9 : 0.45);
       this.dashIndicator.setAlpha(dashReady ? 1 : 0.55);
     }
     this.playerBody.setMaxVelocity(speed + delta);

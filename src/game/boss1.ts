@@ -3,6 +3,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./constants";
 import type { DebugSettings } from "./events";
 import { enemyDeathBurst } from "./effects";
 import { fireEnemyBullet } from "./projectiles";
+import { getVisualPalette } from "./palette";
 
 export const FIRST_BOSS_AT_MS = 60000;
 export const SECOND_BOSS_AT_MS = 120000;
@@ -141,7 +142,7 @@ export class Boss1Controller {
   }
 
   destroy() {
-    enemyDeathBurst(this.scene, this.x, this.y, 0xef4444);
+    enemyDeathBurst(this.scene, this.x, this.y, getVisualPalette().bossPhases[this.bossId][0]);
     this.view.destroy();
   }
 
@@ -263,12 +264,11 @@ export class Boss1Controller {
   }
 
   private redraw(elapsedMs: number) {
+    const palette = getVisualPalette();
     const flash = elapsedMs < this.hitFlashUntil;
     const color =
       flash ? 0xffffff :
-        this.bossId === 1 ? (this.phase === 1 ? 0xb91c1c : this.phase === 2 ? 0xea580c : 0xdc2626) :
-          this.bossId === 2 ? (this.phase === 1 ? 0x9333ea : this.phase === 2 ? 0x7c3aed : 0x6d28d9) :
-            (this.phase === 1 ? 0x0ea5e9 : this.phase === 2 ? 0x0284c7 : 0x0369a1);
+        palette.bossPhases[this.bossId][this.phase - 1];
     const size = flash ? 98 : 92;
     this.view.clear();
     this.view.lineStyle(4, 0xffffff, 0.92);

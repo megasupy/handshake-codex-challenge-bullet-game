@@ -4,6 +4,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH, MAX_ACTIVE_PICKUPS, MAX_PICKUP_VALUE, PICKUP
 import { pickupPop } from "./effects";
 import type { EnemyData, EnemyKind } from "./gameTypes";
 import { fireEnemyBullet } from "./projectiles";
+import { getVisualPalette } from "./palette";
 
 type EnemyShape = Phaser.GameObjects.Shape & Phaser.GameObjects.GameObject;
 
@@ -245,7 +246,7 @@ export function createPickup(scene: Phaser.Scene, pickups: Phaser.Physics.Arcade
     return;
   }
 
-  const pickup = scene.physics.add.image(x, y, "pickup");
+  const pickup = scene.physics.add.image(x, y, getVisualPalette().highContrast ? "pickup-hc" : "pickup");
   const body = pickup.body as Phaser.Physics.Arcade.Body;
   body.setCircle(5).setAllowGravity(false).setDrag(260, 260);
   const angle = rng ? rng.realInRange(0, Math.PI * 2) : Phaser.Math.FloatBetween(0, Math.PI * 2);
@@ -288,14 +289,9 @@ function createEnemy(
 }
 
 function styleEnemy(kind: EnemyKind): { color: number; radius: number } {
-  if (kind === "chaser" || kind === "minion") return { color: 0x60a5fa, radius: kind === "minion" ? 9 : 13 };
-  if (kind === "shooter") return { color: 0xa78bfa, radius: 14 };
-  if (kind === "spinner") return { color: 0xf59e0b, radius: 16 };
-  if (kind === "bomber") return { color: 0x22d3ee, radius: 15 };
-  if (kind === "strafer") return { color: 0xf97316, radius: 14 };
-  if (kind === "mine") return { color: 0xeab308, radius: 13 };
-  if (kind === "sniper") return { color: 0x84cc16, radius: 15 };
-  return { color: 0xf472b6, radius: 14 };
+  const palette = getVisualPalette();
+  const baseRadius = kind === "minion" ? 9 : kind === "spinner" ? 16 : kind === "bomber" ? 15 : kind === "sniper" ? 15 : 14;
+  return { color: palette.enemyKinds[kind], radius: baseRadius };
 }
 
 function getEnemyHp(kind: EnemyKind, threat: number, debug: DebugSettings): number {
