@@ -7,7 +7,7 @@ import { BOSS_RESPAWN_DELAY_MS, Boss1Controller, FIRST_BOSS_AT_MS, SECOND_BOSS_A
 import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_DEBUG_SETTINGS, DEFAULT_PLAYER_STATS, TELEMETRY_SAMPLE_INTERVAL_MS, UPGRADE_INTERVAL_MS } from "./constants";
 import { applyDebugSettings as mergeDebugSettings } from "./debug";
 import { combatText, dashTrail, enemyDeathBurst, flashEnemy, pickupCollectBurst, playerHitBurst, upgradePulse } from "./effects";
-import { createPickup, firePattern, getEnemyWaveStep, restoreEnemyFromState, spawnEnemyIfReady, updateEnemies } from "./enemies";
+import { createPickup, firePattern, getEnemyWaveStep, restoreEnemyFromState, spawnEnemyAt, spawnEnemyIfReady, updateEnemies } from "./enemies";
 import { emitAutomationComplete, emitAutomationSnapshot, emitBossHud, emitDebugStats, emitGameOver, emitHud, emitUpgrade, type DebugSettings, type UpgradeOption } from "./events";
 import type { EnemyData } from "./gameTypes";
 import { magnetPickups, restorePickup } from "./pickups";
@@ -596,11 +596,16 @@ export class GameScene extends Phaser.Scene {
     if (data.kind === "bomber") {
       firePattern(this, this.enemyBullets, enemy, "spinner", this.getThreatLevel(), this.debug, this.player);
     }
+    if (data.kind === "splitter") {
+      for (const offset of [-0.55, 0.55]) {
+        spawnEnemyAt(this, this.enemies, this.rng, "minion", this.getThreatLevel(), this.elapsedMs, this.debug, enemy.x + Math.cos(offset) * 20, enemy.y + Math.sin(offset) * 20);
+      }
+    }
 
     this.kills += 1;
-    this.score += data.kind === "spinner" || data.kind === "bomber" ? 24 : 12;
+    this.score += data.kind === "spinner" || data.kind === "bomber" || data.kind === "splitter" ? 24 : 12;
     enemyDeathBurst(this, enemy.x, enemy.y, (enemy.getData("color") as number | undefined) ?? 0xfb7185);
-    combatText(this, enemy.x, enemy.y - 10, `+${data.kind === "spinner" || data.kind === "bomber" ? 24 : 12}`, getVisualPalette().pickup);
+    combatText(this, enemy.x, enemy.y - 10, `+${data.kind === "spinner" || data.kind === "bomber" || data.kind === "splitter" ? 24 : 12}`, getVisualPalette().pickup);
     playSound("enemy-death");
     if (this.rng.frac() > 0.2) createPickup(this, this.pickups, enemy.x, enemy.y, this.rng, 1);
     enemy.destroy();

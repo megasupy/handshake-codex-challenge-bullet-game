@@ -35,15 +35,15 @@ const PHASE_TABLES: Record<1 | 2 | 3, WaveBlock[]> = {
   ],
   2: [
     { durationMs: 12000, mix: { chaser: 0.45, shooter: 0.28, spinner: 0.14, bomber: 0.13 }, spawnScale: 0.98 },
-    { durationMs: 12000, mix: { chaser: 0.3, strafer: 0.32, shooter: 0.18, spinner: 0.1, bomber: 0.1 }, spawnScale: 0.93 },
-    { durationMs: 12000, mix: { strafer: 0.28, mine: 0.24, shooter: 0.18, spinner: 0.15, chaser: 0.15 }, spawnScale: 0.84 },
-    { durationMs: 24000, mix: { strafer: 0.25, mine: 0.2, bomber: 0.14, shooter: 0.16, spinner: 0.14, chaser: 0.11 }, spawnScale: 0.82 },
+    { durationMs: 12000, mix: { chaser: 0.26, strafer: 0.28, shooter: 0.16, spinner: 0.1, bomber: 0.08, splitter: 0.12 }, spawnScale: 0.93 },
+    { durationMs: 12000, mix: { strafer: 0.24, mine: 0.22, shooter: 0.14, spinner: 0.12, chaser: 0.14, splitter: 0.14 }, spawnScale: 0.84 },
+    { durationMs: 24000, mix: { strafer: 0.22, mine: 0.16, bomber: 0.12, shooter: 0.14, spinner: 0.12, chaser: 0.1, splitter: 0.14 }, spawnScale: 0.82 },
   ],
   3: [
-    { durationMs: 12000, mix: { chaser: 0.2, strafer: 0.25, shooter: 0.2, sniper: 0.12, spinner: 0.13, mine: 0.1 }, spawnScale: 0.95 },
-    { durationMs: 12000, mix: { strafer: 0.24, sniper: 0.14, summoner: 0.12, shooter: 0.16, spinner: 0.17, mine: 0.17 }, spawnScale: 0.92 },
-    { durationMs: 12000, mix: { sniper: 0.16, summoner: 0.14, mine: 0.18, strafer: 0.2, spinner: 0.16, bomber: 0.16 }, spawnScale: 0.9 },
-    { durationMs: 36000, mix: { sniper: 0.13, summoner: 0.16, strafer: 0.2, mine: 0.18, spinner: 0.15, bomber: 0.1, shooter: 0.08 }, spawnScale: 0.88 },
+    { durationMs: 12000, mix: { chaser: 0.18, strafer: 0.22, shooter: 0.18, sniper: 0.12, spinner: 0.1, mine: 0.08, splitter: 0.12 }, spawnScale: 0.95 },
+    { durationMs: 12000, mix: { strafer: 0.22, sniper: 0.12, summoner: 0.1, shooter: 0.14, spinner: 0.14, mine: 0.14, splitter: 0.12 }, spawnScale: 0.92 },
+    { durationMs: 12000, mix: { sniper: 0.14, summoner: 0.12, mine: 0.16, strafer: 0.18, spinner: 0.14, bomber: 0.14, splitter: 0.12 }, spawnScale: 0.9 },
+    { durationMs: 36000, mix: { sniper: 0.12, summoner: 0.14, strafer: 0.18, mine: 0.16, spinner: 0.14, bomber: 0.1, shooter: 0.08, splitter: 0.08 }, spawnScale: 0.88 },
   ],
 };
 
@@ -91,6 +91,33 @@ export function spawnEnemyIfReady(args: {
   return args.elapsedMs + interval;
 }
 
+export function spawnEnemyAt(
+  scene: Phaser.Scene,
+  enemies: Phaser.Physics.Arcade.Group,
+  rng: Phaser.Math.RandomDataGenerator,
+  kind: EnemyKind,
+  threat: number,
+  elapsedMs: number,
+  debug: DebugSettings,
+  x: number,
+  y: number,
+): void {
+  const { color, radius } = styleEnemy(kind);
+  const enemy = createEnemyShape(scene, kind, x, y, radius, color);
+  scene.physics.add.existing(enemy);
+  const body = enemy.body as Phaser.Physics.Arcade.Body;
+  body.setCircle(radius).setCollideWorldBounds(true);
+  enemy.setData("enemy", {
+    kind,
+    hp: getEnemyHp(kind, threat, debug),
+    speed: getEnemySpeed(kind, threat, debug),
+    fireAt: elapsedMs + rng.between(220, 620),
+    casts: 0,
+  } satisfies EnemyData);
+  enemy.setData("color", color);
+  enemies.add(enemy);
+}
+
 export function updateEnemies(args: {
   enemies: Phaser.Physics.Arcade.Group;
   enemyBullets: Phaser.Physics.Arcade.Group;
@@ -115,6 +142,8 @@ export function updateEnemies(args: {
       body.setVelocity(Math.cos(angle) * data.speed * 0.2, Math.sin(angle) * data.speed * 0.2);
     } else if (data.kind === "summoner") {
       body.setVelocity(Math.cos(angle) * data.speed * 0.42, Math.sin(angle) * data.speed * 0.42);
+    } else if (data.kind === "splitter") {
+      body.setVelocity(Math.cos(angle) * data.speed * 0.9, Math.sin(angle) * data.speed * 0.9);
     } else {
       body.setVelocity(Math.cos(angle) * data.speed, Math.sin(angle) * data.speed);
     }
@@ -236,6 +265,14 @@ export function firePattern(
   }
   if (kind === "summoner") {
     for (const offset of [-0.2, 0.2]) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + offset, 140 + threat * 4, debug);
+    return;
+  }
+  if (kind === "splitter") {
+    const count = threat < 14 ? 3 : 5;
+    for (let i = 0; i < count; i += 1) {
+      const offset = (i - (count - 1) / 2) * 0.12;
+      fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + offset, 146 + threat * 4, debug, { radiusScale: i === Math.floor(count / 2) ? 1.2 : 1 });
+    }
   }
 }
 
@@ -290,7 +327,7 @@ function createEnemy(
 
 function styleEnemy(kind: EnemyKind): { color: number; radius: number } {
   const palette = getVisualPalette();
-  const baseRadius = kind === "minion" ? 9 : kind === "spinner" ? 16 : kind === "bomber" ? 15 : kind === "sniper" ? 15 : 14;
+  const baseRadius = kind === "minion" ? 9 : kind === "spinner" ? 16 : kind === "bomber" ? 15 : kind === "sniper" ? 15 : kind === "splitter" ? 15 : 14;
   return { color: palette.enemyKinds[kind], radius: baseRadius };
 }
 
@@ -300,6 +337,7 @@ function getEnemyHp(kind: EnemyKind, threat: number, debug: DebugSettings): numb
       kind === "bomber" ? 4 + threat :
         kind === "sniper" ? 4 + Math.floor(threat * 0.6) :
           kind === "summoner" ? 6 + Math.floor(threat * 0.8) :
+            kind === "splitter" ? 5 + Math.floor(threat * 0.7) :
             kind === "minion" ? 1 + Math.floor(threat * 0.2) :
               2 + Math.floor(threat / 2);
   return Math.ceil(base * debug.enemyHealthMultiplier);
@@ -313,6 +351,7 @@ function getEnemySpeed(kind: EnemyKind, threat: number, debug: DebugSettings): n
           kind === "mine" ? 62 + threat * 3 :
             kind === "sniper" ? 52 + threat * 2 :
               kind === "summoner" ? 58 + threat * 3 :
+                kind === "splitter" ? 88 + threat * 4 :
                 kind === "minion" ? 112 + threat * 5 :
                   40 + threat * 2;
   return base * debug.enemySpeedMultiplier;
@@ -326,6 +365,7 @@ function getEnemyFireCadenceMs(kind: EnemyKind, threat: number, debug: DebugSett
           kind === "bomber" ? 1400 :
             kind === "strafer" ? 1280 :
               kind === "summoner" ? 2000 :
+                kind === "splitter" ? 1550 :
                 1650;
   return Math.max(760, (base - threat * 26) * debug.enemyFireRateMultiplier);
 }
@@ -353,7 +393,7 @@ function weightedPick(mix: Partial<Record<EnemyKind, number>>, rng: Phaser.Math.
 }
 
 function canSpawnKind(enemies: Phaser.Physics.Arcade.Group, kind: EnemyKind): boolean {
-  if (kind !== "sniper" && kind !== "summoner" && kind !== "mine") return true;
+  if (kind !== "sniper" && kind !== "summoner" && kind !== "mine" && kind !== "splitter") return true;
   let count = 0;
   enemies.children.each((child) => {
     const enemy = child as EnemyShape;
@@ -362,7 +402,7 @@ function canSpawnKind(enemies: Phaser.Physics.Arcade.Group, kind: EnemyKind): bo
     if (data?.kind === kind) count += 1;
     return true;
   });
-  const cap = kind === "sniper" ? 3 : kind === "summoner" ? 3 : 6;
+  const cap = kind === "sniper" ? 3 : kind === "summoner" ? 3 : kind === "splitter" ? 4 : 6;
   return count < cap;
 }
 
@@ -394,6 +434,7 @@ function createEnemyShape(scene: Phaser.Scene, kind: EnemyKind, x: number, y: nu
   if (kind === "mine") return scene.add.polygon(x, y, [0, -radius, radius * 0.75, 0, 0, radius, -radius * 0.75, 0], color, 1) as EnemyShape;
   if (kind === "sniper") return scene.add.star(x, y, 4, radius * 0.48, radius, color, 1) as EnemyShape;
   if (kind === "summoner") return scene.add.rectangle(x, y, radius * 1.5, radius * 1.5, color, 1) as EnemyShape;
+  if (kind === "splitter") return scene.add.polygon(x, y, [0, -radius, radius * 0.86, -radius * 0.5, radius * 0.86, radius * 0.5, 0, radius, -radius * 0.86, radius * 0.5, -radius * 0.86, -radius * 0.5], color, 1) as EnemyShape;
   if (kind === "minion") return scene.add.circle(x, y, radius, color, 1) as EnemyShape;
   return scene.add.polygon(x, y, [0, -radius, radius, 0, 0, radius, -radius, 0], color, 1) as EnemyShape;
 }

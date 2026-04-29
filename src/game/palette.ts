@@ -53,6 +53,7 @@ export function buildVisualPalette(highContrast: boolean): VisualPalette {
         mine: 0xeab308,
         sniper: 0xa3e635,
         summoner: 0xf472b6,
+        splitter: 0xfb7185,
         minion: 0x60a5fa,
       },
       bossPhases: {
@@ -90,6 +91,7 @@ export function buildVisualPalette(highContrast: boolean): VisualPalette {
       mine: 0xeab308,
       sniper: 0x84cc16,
       summoner: 0xf472b6,
+      splitter: 0xfb7185,
       minion: 0x60a5fa,
     },
     bossPhases: {
