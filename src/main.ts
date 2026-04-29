@@ -20,6 +20,7 @@ import type { GameMode, LeaderboardResult, RunRecord, RunSummary } from "./types
 import type { TelemetryConfig, TelemetryRun } from "./game/telemetry";
 
 const AUTOPLAYER_KEY = "storm_debug_autoplayer_v1";
+const LEADERBOARD_MODE_KEY = "storm_leaderboard_mode_v1";
 const query = new URLSearchParams(window.location.search);
 const automationConfig = getAutomationConfig();
 
@@ -178,7 +179,7 @@ const debugControls = {
 };
 
 let currentMode: GameMode = "endless";
-let leaderboardMode: GameMode = "endless";
+let leaderboardMode: GameMode = readLeaderboardMode();
 let lastRun: RunSummary | null = null;
 let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
@@ -302,11 +303,13 @@ menuButton.addEventListener("click", showMenu);
 leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(leaderboardMode));
 leaderboardModeEndless.addEventListener("click", () => {
   leaderboardMode = "endless";
+  writeLeaderboardMode(leaderboardMode);
   renderLeaderboardModeButtons();
   void refreshLeaderboard(leaderboardMode);
 });
 leaderboardModeDaily.addEventListener("click", () => {
   leaderboardMode = "daily";
+  writeLeaderboardMode(leaderboardMode);
   renderLeaderboardModeButtons();
   void refreshLeaderboard(leaderboardMode);
 });
@@ -1449,6 +1452,23 @@ function buildReplayLink(run: Pick<RunSummary, "mode" | "seed">) {
 
 function buildRunLink(run: Pick<RunRecord, "mode" | "seed">) {
   return buildReplayLink(run);
+}
+
+function readLeaderboardMode(): GameMode {
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_MODE_KEY);
+    return raw === "daily" ? "daily" : "endless";
+  } catch {
+    return "endless";
+  }
+}
+
+function writeLeaderboardMode(mode: GameMode): void {
+  try {
+    localStorage.setItem(LEADERBOARD_MODE_KEY, mode);
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 function refreshCheckpointUi() {
