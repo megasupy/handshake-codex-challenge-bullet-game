@@ -94,6 +94,7 @@ const profileBackup = mustGet("profile-backup") as HTMLTextAreaElement;
 const profileBackupExport = mustGetButton("profile-backup-export");
 const profileBackupImport = mustGetButton("profile-backup-import");
 const profileBackupCopy = mustGetButton("profile-backup-copy");
+const profileResetAll = mustGetButton("profile-reset-all");
 const profileBackupStatus = mustGet("profile-backup-status");
 const upgradeScreen = mustGet("upgrade-screen");
 const tutorialScreen = mustGet("tutorial-screen");
@@ -250,6 +251,7 @@ profileBackupCopy.addEventListener("click", async () => {
     profileBackupStatus.textContent = "Copy failed. Use the text box manually.";
   }
 });
+profileResetAll.addEventListener("click", () => resetAllLocalData());
 tutorialClose.addEventListener("click", () => {
   currentTutorial = markTutorialSeen(!tutorialDontShow.checked);
   refreshTutorialUi();
@@ -914,6 +916,52 @@ async function syncNow() {
   syncStatusSummary.textContent = "Trying to sync pending runs now.";
   await syncPendingRuns();
   renderSyncStatusPanel();
+}
+
+function resetAllLocalData() {
+  const ok = window.confirm("Reset all local progress, settings, telemetry, and run history?");
+  if (!ok) return;
+
+  [
+    "storm_progression_v1",
+    "storm_preferences_v1",
+    "storm_records_v1",
+    "storm_achievements_v1",
+    "storm_tutorial_seen_v1",
+    "storm_keybinds_v1",
+    "storm_runs_v1",
+    "storm_telemetry_archive_v1",
+    "storm_checkpoint_v1",
+    "storm_player_name_v1",
+  ].forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore storage failures.
+    }
+  });
+
+  currentProgression = readProgression();
+  currentPreferences = readPreferences();
+  currentRecords = readRecords();
+  currentAchievements = readAchievements();
+  currentKeybinds = readKeybinds();
+  currentTelemetryArchive = readTelemetryArchive();
+  currentTutorial = readTutorialState();
+  playerNameInput.value = getSavedName();
+  applyPreferencesToUi(currentPreferences);
+  renderProgressionPanel();
+  renderRecordsPanel();
+  renderRecentRunsPanel();
+  renderAchievementsPanel();
+  renderSyncStatusPanel();
+  renderTelemetryTimeline();
+  renderTelemetryArchive();
+  refreshTutorialUi();
+  renderKeybindsPanel();
+  refreshCheckpointUi();
+  profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
+  profileBackupStatus.textContent = "All local data reset.";
 }
 
 function shouldAutoPause(): boolean {
