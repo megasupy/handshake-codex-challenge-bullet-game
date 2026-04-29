@@ -13,6 +13,7 @@ import { formatTutorialSummary, markTutorialSeen, readTutorialState, type Tutori
 import { clearTelemetryArchive, formatTelemetryArchiveEntry, readTelemetryArchive, saveTelemetryRun, type TelemetryArchiveEntry } from "./services/telemetryArchive";
 import { formatPreferencesSummary, readPreferences, updatePreferences, type PreferencesState } from "./services/preferences";
 import { formatRecordsSummary, readRecords, updateRecords, type RecordsState } from "./services/records";
+import { formatAchievementsSummary, listAchievements, readAchievements, updateAchievements, type AchievementState } from "./services/achievements";
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
 import type { GameMode, LeaderboardResult, RunRecord, RunSummary } from "./types";
 import type { TelemetryConfig, TelemetryRun } from "./game/telemetry";
@@ -59,6 +60,9 @@ const recordsStats = mustGet("records-stats");
 const recentRunsCount = mustGet("recent-runs-count");
 const recentRunsSummary = mustGet("recent-runs-summary");
 const recentRunsList = mustGet("recent-runs-list");
+const achievementsCount = mustGet("achievements-count");
+const achievementsSummary = mustGet("achievements-summary");
+const achievementsList = mustGet("achievements-list");
 const preferencesSummary = mustGet("preferences-summary");
 const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
@@ -137,6 +141,7 @@ let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
 let currentPreferences: PreferencesState = readPreferences();
 let currentRecords: RecordsState = readRecords();
+let currentAchievements: AchievementState = readAchievements();
 let currentKeybinds: KeybindState = readKeybinds();
 let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
 let currentTutorial: TutorialState = readTutorialState();
@@ -330,6 +335,7 @@ gameEvents.addEventListener("game-over", (event) => {
   lastRun = (event as CustomEvent<RunSummary>).detail;
   currentProgression = grantRunReward(lastRun);
   currentRecords = updateRecords(lastRun);
+  currentAchievements = updateAchievements(lastRun);
   text("game-over-status", lastRun.survivalMs >= 60000 ? "Storm survived" : "Run ended");
   text("final-score", lastRun.score.toLocaleString());
   text("final-time", `${(lastRun.survivalMs / 1000).toFixed(1)}s`);
@@ -341,6 +347,7 @@ gameEvents.addEventListener("game-over", (event) => {
   renderProgressionPanel();
   renderRecordsPanel();
   renderRecentRunsPanel();
+  renderAchievementsPanel();
   show(gameOver);
   hideHud();
   hideBossHud();
@@ -387,6 +394,7 @@ void refreshLeaderboard("endless");
 renderProgressionPanel();
 renderRecordsPanel();
 renderRecentRunsPanel();
+renderAchievementsPanel();
 refreshCheckpointUi();
 renderTelemetryArchive();
 profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
@@ -668,6 +676,27 @@ function renderRecentRunsPanel() {
   });
 }
 
+function renderAchievementsPanel() {
+  const achievementDefs = listAchievements();
+  const unlocked = Object.values(currentAchievements.unlocked).filter(Boolean).length;
+  achievementsCount.textContent = `${unlocked}/${achievementDefs.length}`;
+  achievementsSummary.textContent = formatAchievementsSummary(currentAchievements);
+  achievementsList.innerHTML = "";
+
+  for (const achievement of achievementDefs) {
+    const unlockedAt = currentAchievements.unlocked[achievement.id];
+    const item = document.createElement("li");
+    item.className = unlockedAt
+      ? "rounded-md border border-emerald-500/40 bg-emerald-950/40 px-3 py-3 text-sm text-emerald-100"
+      : "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-400";
+    item.innerHTML = `
+      <strong class="block truncate ${unlockedAt ? "text-emerald-100" : "text-white"}">${escapeHtml(achievement.title)}</strong>
+      <span class="mt-1 block text-xs leading-5 ${unlockedAt ? "text-emerald-200/80" : "text-slate-500"}">${escapeHtml(achievement.description)}</span>
+    `;
+    achievementsList.append(item);
+  }
+}
+
 function applyPreferenceControls() {
   currentPreferences = updatePreferences({
     soundVolume: Number(prefsVolume.value),
@@ -804,6 +833,7 @@ function syncProfileFromStorage() {
   currentProgression = readProgression();
   currentPreferences = readPreferences();
   currentRecords = readRecords();
+  currentAchievements = readAchievements();
   currentKeybinds = readKeybinds();
   currentTutorial = readTutorialState();
   currentTelemetryArchive = readTelemetryArchive();
@@ -812,6 +842,7 @@ function syncProfileFromStorage() {
   renderProgressionPanel();
   renderRecordsPanel();
   renderRecentRunsPanel();
+  renderAchievementsPanel();
   renderTelemetryArchive();
   refreshTutorialUi();
   renderKeybindsPanel();
