@@ -32,3 +32,8 @@
 - Boss pacing should not fall off after the first fight.
 - Added a fixed second boss checkpoint at 120s so the run has another major spike instead of tapering out.
 - Boss health was scaled up to more than 2.5x the previous baseline so the fight lasts long enough to matter.
+
+## Pass 7
+- The 90s stop was coming from the automation default, not the real game loop.
+- Raised the default automation max run time to 300s so balance tests can reach the second boss and beyond.
+- Boss scheduling is now stateful: first boss at 60s, second boss at 120s, later boss fights resume on a delay after that.

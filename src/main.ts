@@ -439,7 +439,7 @@ function getAutomationConfig() {
   const autoplayer = query.get("autoplayer") === "1" || active;
   const sampleIntervalMs = Math.max(100, Number(query.get("sampleMs") || 250));
   const snapshotIntervalMs = Math.max(1000, Number(query.get("snapshotMs") || 3000));
-  const maxRunMs = Math.max(1000, Number(query.get("maxMs") || 90000));
+  const maxRunMs = Math.max(1000, Number(query.get("maxMs") || 300000));
   const timeScaleParam = query.get("timeScale");
   const timeScale = timeScaleParam ? Math.max(0.1, Math.min(20, Number(timeScaleParam))) : null;
   return {

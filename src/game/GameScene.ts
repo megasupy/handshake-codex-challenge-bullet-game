@@ -43,6 +43,7 @@ export class GameScene extends Phaser.Scene {
   private pausedForUpgrade = false;
   private nextUpgradeAt = UPGRADE_INTERVAL_MS;
   private nextBossAt = FIRST_BOSS_AT_MS;
+  private bossEncountersSpawned = 0;
   private maxThreatLevel = 1;
   private debug: DebugSettings = { ...DEFAULT_DEBUG_SETTINGS };
   private stats = { ...DEFAULT_PLAYER_STATS };
@@ -167,7 +168,7 @@ export class GameScene extends Phaser.Scene {
       this.boss.destroy();
       this.boss = null;
       this.activeBossStartedAt = null;
-      this.nextBossAt = Math.max(this.elapsedMs + 3000, SECOND_BOSS_AT_MS);
+      this.nextBossAt = this.bossEncountersSpawned < 2 ? SECOND_BOSS_AT_MS : this.elapsedMs + 3000;
       this.emitBossState();
     }
   }
@@ -190,6 +191,7 @@ export class GameScene extends Phaser.Scene {
     this.pausedForUpgrade = false;
     this.nextUpgradeAt = UPGRADE_INTERVAL_MS;
     this.nextBossAt = FIRST_BOSS_AT_MS;
+    this.bossEncountersSpawned = 0;
     this.maxThreatLevel = 1;
     this.boss = null;
     this.activeBossStartedAt = null;
@@ -238,6 +240,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.resume();
       this.pausedForUpgrade = false;
       this.boss = new Boss1Controller(this, this.elapsedMs, threat);
+      this.bossEncountersSpawned += 1;
       this.activeBossStartedAt = this.elapsedMs;
       this.telemetry?.logEvent(this.elapsedMs, "boss-spawn", { threat });
       this.cameras.main.shake(240, 0.004);
@@ -394,7 +397,7 @@ export class GameScene extends Phaser.Scene {
     this.boss = null;
     this.activeBossStartedAt = null;
     this.score += 250;
-    this.nextBossAt = Math.max(this.elapsedMs + BOSS_RESPAWN_DELAY_MS, SECOND_BOSS_AT_MS);
+    this.nextBossAt = this.bossEncountersSpawned < 2 ? SECOND_BOSS_AT_MS : this.elapsedMs + BOSS_RESPAWN_DELAY_MS;
     this.spawnAt = this.elapsedMs + 1200;
     playSound("enemy-death");
     this.emitBossState();
