@@ -69,6 +69,7 @@ const selectedRunPin = mustGetButton("selected-run-pin");
 const selectedRunReplay = mustGetButton("selected-run-replay");
 const selectedRunCopySeed = mustGetButton("selected-run-copy-seed");
 const selectedRunCopyLink = mustGetButton("selected-run-copy-link");
+const selectedRunCopyReport = mustGetButton("selected-run-copy-report");
 const achievementsCount = mustGet("achievements-count");
 const achievementsSummary = mustGet("achievements-summary");
 const achievementsList = mustGet("achievements-list");
@@ -147,6 +148,7 @@ const selectedBoardPin = mustGetButton("selected-board-pin");
 const selectedBoardReplay = mustGetButton("selected-board-replay");
 const selectedBoardCopySeed = mustGetButton("selected-board-copy-seed");
 const selectedBoardCopyLink = mustGetButton("selected-board-copy-link");
+const selectedBoardCopyReport = mustGetButton("selected-board-copy-report");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
@@ -329,6 +331,16 @@ selectedRunCopyLink.addEventListener("click", async () => {
     showToast("Selected run link copy failed.", "error");
   }
 });
+selectedRunCopyReport.addEventListener("click", async () => {
+  if (!selectedRecentRun) return;
+  const report = buildRunRecordReport(selectedRecentRun);
+  try {
+    await navigator.clipboard.writeText(report);
+    showToast("Selected run report copied.", "success");
+  } catch {
+    showToast("Selected run report copy failed.", "error");
+  }
+});
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
 leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(leaderboardMode));
@@ -380,6 +392,16 @@ selectedBoardCopyLink.addEventListener("click", async () => {
     showToast("Leaderboard link copied.", "success");
   } catch {
     showToast("Leaderboard link copy failed.", "error");
+  }
+});
+selectedBoardCopyReport.addEventListener("click", async () => {
+  if (!selectedBoardRun) return;
+  const report = buildRunRecordReport(selectedBoardRun);
+  try {
+    await navigator.clipboard.writeText(report);
+    showToast("Leaderboard run report copied.", "success");
+  } catch {
+    showToast("Leaderboard run report copy failed.", "error");
   }
 });
 submitButton.addEventListener("click", submitCurrentRun);
@@ -1659,6 +1681,22 @@ function buildRunReport(run: RunSummary): string {
     `buildStyle: ${style.title}`,
     `buildNote: ${style.note}`,
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
+  ];
+  return lines.join("\n");
+}
+
+function buildRunRecordReport(run: RunRecord): string {
+  const lines = [
+    `player: ${run.playerName}`,
+    `mode: ${run.mode}`,
+    `seed: ${run.seed}`,
+    `survival: ${(run.survivalMs / 1000).toFixed(1)}s`,
+    `score: ${run.score}`,
+    `kills: ${run.kills}`,
+    `threat: ${run.maxThreatLevel}`,
+    `synced: ${run.synced ? "yes" : "no"}`,
+    `pinned: ${isRunPinned(run.id) ? "yes" : "no"}`,
+    `id: ${run.id}`,
   ];
   return lines.join("\n");
 }
