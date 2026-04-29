@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sixty Second Storm</title>
+  </head>
+  <body class="bg-void text-slate-100 antialiased">
+    <div id="app" class="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_20%_10%,rgba(94,234,212,.12),transparent_32%),radial-gradient(circle_at_80%_0%,rgba(251,113,133,.10),transparent_28%),#07090f]">
+      <div id="game-shell" class="relative mx-auto flex min-h-screen max-w-[1800px] items-center justify-center p-3 sm:p-6">
+        <div id="game-container" class="relative aspect-[16/9] w-full max-w-[1600px] overflow-hidden rounded-lg border border-line bg-black shadow-glow"></div>
+        <div id="hud" class="pointer-events-none absolute left-1/2 top-5 hidden w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 grid-cols-4 gap-2 sm:top-8 sm:gap-3">
+          <div class="hud-tile">
+            <span class="hud-label">Time</span>
+            <strong id="hud-time" class="hud-value">0.0</strong>
+          </div>
+          <div class="hud-tile">
+            <span class="hud-label">Score</span>
+            <strong id="hud-score" class="hud-value">0</strong>
+          </div>
+          <div class="hud-tile">
+            <span class="hud-label">Threat</span>
+            <strong id="hud-threat" class="hud-value">1</strong>
+          </div>
+          <div class="hud-tile">
+            <span class="hud-label">HP</span>
+            <strong id="hud-health" class="hud-value">3</strong>
+          </div>
+        </div>
+        <div id="boss-hud" class="pointer-events-none absolute left-1/2 top-28 z-10 hidden w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 sm:top-32">
+          <div class="rounded-md border border-red-500/50 bg-slate-950/80 px-4 py-3 shadow-lg backdrop-blur">
+            <div class="mb-2 flex items-center justify-between gap-4">
+              <strong id="boss-name" class="text-sm font-black uppercase tracking-wider text-red-200">Boss</strong>
+              <span id="boss-phase" class="text-xs font-bold uppercase tracking-wider text-slate-300">Phase 1</span>
+            </div>
+            <div class="h-4 overflow-hidden rounded-full border border-red-400/50 bg-red-950/70">
+              <div id="boss-health-fill" class="h-full w-full bg-red-500 transition-[width] duration-100"></div>
+            </div>
+          </div>
+        </div>
+        <section id="menu" class="overlay">
+          <div class="panel max-w-xl">
+            <p class="eyebrow">Endless bullet-hell survival</p>
+            <h1 class="text-5xl font-black tracking-normal text-white sm:text-7xl">Sixty Second Storm</h1>
+            <p class="mt-5 max-w-lg text-base leading-7 text-slate-300 sm:text-lg">
+              Dodge the storm, auto-fire at nearby enemies, pick upgrades, and survive as long as the arena allows.
+            </p>
+            <div class="mt-7 flex flex-wrap gap-3">
+              <button id="play-button" class="btn-primary">Play</button>
+              <button id="daily-button" class="btn-secondary">Daily Seed</button>
+            </div>
+            <div class="mt-6 flex flex-wrap gap-2 text-sm text-slate-400">
+              <span>Move: WASD / arrows</span>
+              <span>Dash: Space</span>
+              <span>Debug: backtick</span>
+            </div>
+          </div>
+          <aside class="panel w-full max-w-md">
+            <div class="flex items-center justify-between gap-4">
+              <h2 class="text-2xl font-bold text-white">Leaderboard</h2>
+              <span id="leaderboard-source" class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">Local</span>
+            </div>
+            <ol id="leaderboard-list" class="mt-5 space-y-2"></ol>
+          </aside>
+        </section>
+        <section id="upgrade-screen" class="overlay hidden">
+          <div class="panel w-full max-w-3xl">
+            <p class="eyebrow">Choose one</p>
+            <h2 class="text-4xl font-black text-white">Upgrade</h2>
+            <div id="upgrade-options" class="mt-6 grid gap-3 sm:grid-cols-3"></div>
+          </div>
+        </section>
+        <section id="game-over" class="overlay hidden">
+          <div class="panel max-w-xl">
+            <p class="eyebrow" id="game-over-status">Run ended</p>
+            <h2 id="final-score" class="text-5xl font-black text-white">0</h2>
+            <div class="mt-4 grid grid-cols-3 gap-2 text-center text-sm text-slate-300">
+              <span id="final-time">0.0s</span>
+              <span id="final-kills">0 kills</span>
+              <span id="final-threat">Threat 1</span>
+            </div>
+            <label class="mt-6 block">
+              <span class="text-sm font-semibold text-slate-300">Name</span>
+              <input id="player-name" class="mt-2 w-full rounded-md border border-line bg-slate-950/80 px-4 py-3 text-white outline-none ring-pulse transition focus:ring-2" maxlength="18" autocomplete="nickname" placeholder="pilot" />
+            </label>
+            <p id="submit-status" class="mt-3 min-h-6 text-sm text-slate-300"></p>
+            <div class="mt-5 flex flex-wrap gap-3">
+              <button id="submit-button" class="btn-primary">Submit Score</button>
+              <button id="restart-button" class="btn-secondary">Restart</button>
+              <button id="menu-button" class="btn-secondary">Menu</button>
+            </div>
+          </div>
+        </section>
+        <button id="debug-toggle" class="fixed bottom-4 right-4 z-30 hidden rounded-md border border-line bg-slate-950/90 px-3 py-2 text-xs font-black uppercase tracking-wider text-pulse shadow-lg">Debug</button>
+        <aside id="debug-panel" class="fixed bottom-16 right-4 z-30 hidden max-h-[calc(100vh-6rem)] w-[min(26rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-line bg-slate-950/95 p-4 shadow-2xl">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="eyebrow mb-1">Runtime tools</p>
+              <h2 class="text-xl font-black text-white">Debug Menu</h2>
+            </div>
+            <button id="debug-close" class="btn-secondary px-3 py-2">Close</button>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
+            <label class="debug-check col-span-2">
+              <input id="debug-enabled" type="checkbox" />
+              <span>Enable difficulty overrides</span>
+            </label>
+            <label class="debug-check col-span-2">
+              <input id="debug-invulnerable" type="checkbox" />
+              <span>Invulnerable</span>
+            </label>
+            <label class="debug-check col-span-2">
+              <input id="debug-autoplayer" type="checkbox" />
+              <span>AI autoplayer</span>
+            </label>
+          </div>
+          <div class="mt-4 grid gap-3">
+            <label class="debug-field">
+              <span>Threat override <b id="debug-threat-value">0</b></span>
+              <input id="debug-threat" type="range" min="0" max="20" value="0" />
+            </label>
+            <label class="debug-field">
+              <span>Set time seconds</span>
+              <div class="flex gap-2">
+                <input id="debug-time" type="number" min="0" max="3600" value="0" />
+                <button id="debug-apply-time" class="btn-secondary px-3 py-2">Set</button>
+              </div>
+            </label>
+            <label class="debug-field">
+              <span>Time scale <b id="debug-time-scale-value">1.0x</b></span>
+              <input id="debug-time-scale" type="range" min="0.1" max="20" step="0.1" value="1" />
+            </label>
+            <label class="debug-field">
+              <span>Spawn interval <b id="debug-spawn-value">1.0x</b></span>
+              <input id="debug-spawn" type="range" min="0.2" max="3" step="0.1" value="1" />
+            </label>
+            <label class="debug-field">
+              <span>Enemy speed <b id="debug-enemy-speed-value">1.0x</b></span>
+              <input id="debug-enemy-speed" type="range" min="0.2" max="3" step="0.1" value="1" />
+            </label>
+            <label class="debug-field">
+              <span>Enemy bullet speed <b id="debug-bullet-speed-value">1.0x</b></span>
+              <input id="debug-bullet-speed" type="range" min="0.2" max="3" step="0.1" value="1" />
+            </label>
+            <label class="debug-field">
+              <span>Enemy health <b id="debug-health-value">1.0x</b></span>
+              <input id="debug-health" type="range" min="0.2" max="5" step="0.1" value="1" />
+            </label>
+            <label class="debug-field">
+              <span>Enemy fire interval <b id="debug-fire-rate-value">1.0x</b></span>
+              <input id="debug-fire-rate" type="range" min="0.2" max="3" step="0.1" value="1" />
+            </label>
+            <label class="debug-field">
+              <span>Player fire interval <b id="debug-player-fire-value">1.0x</b></span>
+              <input id="debug-player-fire" type="range" min="0.2" max="3" step="0.1" value="1" />
+            </label>
+            <label class="debug-field">
+              <span>Player projectile speed <b id="debug-projectile-speed-value">620</b></span>
+              <input id="debug-projectile-speed" type="range" min="150" max="1400" step="10" value="620" />
+            </label>
+            <label class="debug-field">
+              <span>Enemy cap <b id="debug-enemy-cap-value">120</b></span>
+              <input id="debug-enemy-cap" type="range" min="10" max="500" step="10" value="120" />
+            </label>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button id="debug-clear" class="btn-secondary px-3 py-2">Clear Threats</button>
+            <button id="debug-kill" class="btn-secondary px-3 py-2">End Run</button>
+            <button id="debug-test-sound" class="btn-secondary px-3 py-2">Test Sound</button>
+          </div>
+          <dl id="debug-stats" class="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-300"></dl>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

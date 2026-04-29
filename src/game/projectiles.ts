@@ -1,0 +1,86 @@
+import Phaser from "phaser";
+import type { DebugSettings } from "./events";
+import { ARENA_HEIGHT, ARENA_WIDTH, ENEMY_BULLET_RADIUS, MAX_ACTIVE_ENEMY_BULLETS, PLAYER_BULLET_RADIUS } from "./constants";
+
+export function firePlayerShot(
+  scene: Phaser.Scene,
+  group: Phaser.Physics.Arcade.Group,
+  x: number,
+  y: number,
+  angle: number,
+  damage: number,
+  projectileSpeed: number,
+  pierce: number,
+  debug: DebugSettings,
+): void {
+  const shot = scene.physics.add.image(x, y, "player-shot");
+  const body = shot.body as Phaser.Physics.Arcade.Body;
+  const speedScale = debug.playerProjectileSpeed / 620;
+  const vx = Math.cos(angle) * projectileSpeed * speedScale * debug.timeScale;
+  const vy = Math.sin(angle) * projectileSpeed * speedScale * debug.timeScale;
+  body.setCircle(PLAYER_BULLET_RADIUS).setAllowGravity(false).setVelocity(vx, vy);
+  shot.setData("vx", vx);
+  shot.setData("vy", vy);
+  shot.setData("lastX", shot.x);
+  shot.setData("lastY", shot.y);
+  shot.setData("damage", damage);
+  shot.setData("pierce", pierce);
+  group.add(shot);
+}
+
+export function fireEnemyBullet(
+  scene: Phaser.Scene,
+  group: Phaser.Physics.Arcade.Group,
+  x: number,
+  y: number,
+  angle: number,
+  speed: number,
+  debug: DebugSettings,
+): boolean {
+  if (group.countActive(true) >= MAX_ACTIVE_ENEMY_BULLETS) return false;
+  const texture = getEnemyBulletTexture(angle);
+  const bullet = scene.physics.add.image(x, y, texture);
+  const body = bullet.body as Phaser.Physics.Arcade.Body;
+  const finalSpeed = speed * debug.enemyBulletSpeedMultiplier * debug.timeScale;
+  const vx = Math.cos(angle) * finalSpeed;
+  const vy = Math.sin(angle) * finalSpeed;
+  body.setCircle(ENEMY_BULLET_RADIUS).setAllowGravity(false).setVelocity(vx, vy);
+  bullet.setRotation(angle);
+  bullet.setData("vx", vx);
+  bullet.setData("vy", vy);
+  bullet.setData("lastX", bullet.x);
+  bullet.setData("lastY", bullet.y);
+  group.add(bullet);
+  return true;
+}
+
+function getEnemyBulletTexture(angle: number): string {
+  const roll = Math.abs(Math.sin(angle * 2.7));
+  if (roll > 0.72) return "enemy-bullet-arrow";
+  if (roll > 0.36) return "enemy-bullet-diamond";
+  return "enemy-bullet-circle";
+}
+
+export function updateProjectiles(group: Phaser.Physics.Arcade.Group): void {
+  ensureProjectileMotion(group);
+  group.children.each((child) => {
+    const obj = child as Phaser.Physics.Arcade.Image;
+    if (obj.x < -40 || obj.x > ARENA_WIDTH + 40 || obj.y < -40 || obj.y > ARENA_HEIGHT + 40) obj.destroy();
+    return true;
+  });
+}
+
+function ensureProjectileMotion(group: Phaser.Physics.Arcade.Group): void {
+  group.children.each((child) => {
+    const projectile = child as Phaser.Physics.Arcade.Image;
+    const body = projectile.body as Phaser.Physics.Arcade.Body;
+    const lastX = projectile.getData("lastX") as number;
+    const lastY = projectile.getData("lastY") as number;
+    if (Math.abs(projectile.x - lastX) < 0.01 && Math.abs(projectile.y - lastY) < 0.01) {
+      body.setVelocity(projectile.getData("vx") as number, projectile.getData("vy") as number);
+    }
+    projectile.setData("lastX", projectile.x);
+    projectile.setData("lastY", projectile.y);
+    return true;
+  });
+}
