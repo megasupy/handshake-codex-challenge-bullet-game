@@ -700,6 +700,9 @@ export class GameScene extends Phaser.Scene {
       score: Math.floor(this.score),
       health: this.health,
       threat: this.getThreatLevel(),
+      kills: this.kills,
+      shotsFired: this.playerShotsFired,
+      shotAccuracy: this.playerShotsFired > 0 ? Math.round((this.playerShotsHit / this.playerShotsFired) * 100) / 100 : 0,
     };
   }
 

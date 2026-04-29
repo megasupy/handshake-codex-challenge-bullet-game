@@ -55,6 +55,9 @@ const bossName = mustGet("boss-name");
 const bossPhase = mustGet("boss-phase");
 const bossPattern = mustGet("boss-pattern");
 const bossHealthFill = mustGet("boss-health-fill");
+const hudKills = mustGet("hud-kills");
+const hudShots = mustGet("hud-shots");
+const hudAccuracy = mustGet("hud-accuracy");
 const progressionShards = mustGet("progression-shards");
 const progressionSummary = mustGet("progression-summary");
 const checkpointSummary = mustGet("checkpoint-summary");
@@ -602,6 +605,9 @@ gameEvents.addEventListener("hud", (event) => {
   text("hud-score", Math.floor(detail.score).toString());
   text("hud-threat", detail.threat.toString());
   text("hud-health", detail.health.toString());
+  text("hud-kills", detail.kills.toString());
+  text("hud-shots", detail.shotsFired.toString());
+  text("hud-accuracy", `${Math.round(detail.shotAccuracy * 100)}%`);
   if (runPaused) renderPauseSnapshot();
 });
 

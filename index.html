@@ -10,7 +10,7 @@
       <div id="game-shell" class="relative mx-auto flex min-h-screen max-w-[1800px] items-center justify-center p-3 sm:p-6">
         <div id="game-container" class="relative aspect-[16/9] w-full max-w-[1600px] overflow-hidden rounded-lg border border-line bg-black shadow-glow"></div>
         <div id="toast-stack" aria-live="polite" aria-atomic="true" class="pointer-events-none fixed right-4 top-4 z-50 flex w-[min(92vw,22rem)] flex-col gap-2 sm:right-6 sm:top-6"></div>
-        <div id="hud" class="pointer-events-none absolute left-1/2 top-5 hidden w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 grid-cols-4 gap-2 sm:top-8 sm:gap-3">
+        <div id="hud" class="pointer-events-none absolute left-1/2 top-5 hidden w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 grid-cols-2 gap-2 sm:top-8 sm:grid-cols-4 sm:gap-3 lg:grid-cols-7">
           <div class="hud-tile">
             <span class="hud-label">Time</span>
             <strong id="hud-time" class="hud-value">0.0</strong>
@@ -26,6 +26,18 @@
           <div class="hud-tile">
             <span class="hud-label">HP</span>
             <strong id="hud-health" class="hud-value">3</strong>
+          </div>
+          <div class="hud-tile">
+            <span class="hud-label">Kills</span>
+            <strong id="hud-kills" class="hud-value">0</strong>
+          </div>
+          <div class="hud-tile">
+            <span class="hud-label">Shots</span>
+            <strong id="hud-shots" class="hud-value">0</strong>
+          </div>
+          <div class="hud-tile">
+            <span class="hud-label">Acc</span>
+            <strong id="hud-accuracy" class="hud-value">0%</strong>
           </div>
         </div>
         <div id="boss-hud" class="pointer-events-none absolute left-1/2 top-28 z-10 hidden w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 sm:top-32">

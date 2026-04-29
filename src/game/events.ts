@@ -8,6 +8,9 @@ export type HudPayload = {
   score: number;
   health: number;
   threat: number;
+  kills: number;
+  shotsFired: number;
+  shotAccuracy: number;
 };
 
 export type UpgradeOption = {
