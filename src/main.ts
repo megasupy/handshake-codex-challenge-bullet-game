@@ -64,6 +64,7 @@ const recentRunsSummary = mustGet("recent-runs-summary");
 const recentRunsList = mustGet("recent-runs-list");
 const selectedRunSync = mustGet("selected-run-sync");
 const selectedRunSummary = mustGet("selected-run-summary");
+const selectedRunComparison = mustGet("selected-run-comparison");
 const selectedRunPin = mustGetButton("selected-run-pin");
 const selectedRunReplay = mustGetButton("selected-run-replay");
 const selectedRunCopySeed = mustGetButton("selected-run-copy-seed");
@@ -141,6 +142,7 @@ const leaderboardModeDaily = mustGetButton("leaderboard-mode-daily");
 const leaderboardRefresh = mustGetButton("leaderboard-refresh");
 const selectedBoardSync = mustGet("selected-board-sync");
 const selectedBoardSummary = mustGet("selected-board-summary");
+const selectedBoardComparison = mustGet("selected-board-comparison");
 const selectedBoardPin = mustGetButton("selected-board-pin");
 const selectedBoardReplay = mustGetButton("selected-board-replay");
 const selectedBoardCopySeed = mustGetButton("selected-board-copy-seed");
@@ -926,6 +928,7 @@ function renderSelectedRunPanel() {
   selectedRunPin.textContent = run ? (isRunPinned(run.id) ? "Unpin" : "Pin") : "Pin";
   selectedRunPin.disabled = !run;
   selectedRunSummary.innerHTML = "";
+  selectedRunComparison.innerHTML = "";
 
   const rows: Record<string, string | number> = run
     ? {
@@ -951,6 +954,8 @@ function renderSelectedRunPanel() {
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
     selectedRunSummary.append(item);
   }
+
+  renderRunComparisonGrid(selectedRunComparison, run);
 }
 
 function renderRecentRunsPanel() {
@@ -1002,6 +1007,7 @@ function renderSelectedBoardPanel() {
   selectedBoardPin.textContent = run ? (isRunPinned(run.id) ? "Unpin" : "Pin") : "Pin";
   selectedBoardPin.disabled = !run;
   selectedBoardSummary.innerHTML = "";
+  selectedBoardComparison.innerHTML = "";
 
   const rows: Record<string, string | number> = run
     ? {
@@ -1026,6 +1032,32 @@ function renderSelectedBoardPanel() {
     item.className = "debug-stat";
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
     selectedBoardSummary.append(item);
+  }
+
+  renderRunComparisonGrid(selectedBoardComparison, run);
+}
+
+function renderRunComparisonGrid(container: HTMLElement, run: RunRecord | null) {
+  container.innerHTML = "";
+  const rows: Array<[string, string]> = run
+    ? [
+        ["vs survival", formatDelta(run.survivalMs, currentRecords.bestSurvivalMs)],
+        ["vs score", formatDelta(run.score, currentRecords.bestScore)],
+        ["vs kills", formatDelta(run.kills, currentRecords.bestKills)],
+        ["vs threat", formatDelta(run.maxThreatLevel, currentRecords.bestThreat)],
+      ]
+    : [
+        ["vs survival", "-"],
+        ["vs score", "-"],
+        ["vs kills", "-"],
+        ["vs threat", "-"],
+      ];
+
+  for (const [label, value] of rows) {
+    const item = document.createElement("div");
+    item.className = "debug-stat";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(value)}</strong>`;
+    container.append(item);
   }
 }
 
