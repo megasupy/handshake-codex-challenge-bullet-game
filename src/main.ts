@@ -148,6 +148,8 @@ const runDamage = mustGet("run-damage");
 const runUpgradePath = mustGet("run-upgrade-path");
 const runAdvice = mustGet("run-advice");
 const runBreakdown = mustGet("run-breakdown");
+const runChronologyCount = mustGet("run-chronology-count");
+const runChronology = mustGet("run-chronology");
 const runComparison = mustGet("run-comparison");
 const runSeed = mustGet("run-seed");
 const leaderboardList = mustGet("leaderboard-list");
@@ -676,6 +678,7 @@ gameEvents.addEventListener("game-over", (event) => {
   renderRunUpgradePath(lastRun);
   renderRunAdvice(lastRun);
   renderRunBreakdown(lastRun);
+  renderRunChronology(lastRun);
   renderRunComparison(lastRun, previousRecords);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
@@ -1515,6 +1518,26 @@ function renderRunBreakdown(run: RunSummary) {
   }
 }
 
+function renderRunChronology(run: RunSummary) {
+  const chronology = run.chronology || [];
+  runChronologyCount.textContent = `${chronology.length} event${chronology.length === 1 ? "" : "s"}`;
+  runChronology.innerHTML = "";
+  if (chronology.length === 0) {
+    const item = document.createElement("li");
+    item.className = "rounded-md border border-line bg-slate-950/70 px-3 py-2 text-slate-400";
+    item.textContent = "No chronology recorded.";
+    runChronology.append(item);
+    return;
+  }
+
+  for (const entry of chronology.slice(-8)) {
+    const item = document.createElement("li");
+    item.className = "rounded-md border border-line bg-slate-950/70 px-3 py-2";
+    item.textContent = entry;
+    runChronology.append(item);
+  }
+}
+
 function renderRunComparison(run: RunSummary, previous: RecordsState) {
   runComparison.innerHTML = "";
   const rows: Array<[string, string | number]> = [
@@ -1954,6 +1977,7 @@ function buildRunReport(run: RunSummary): string {
     `upgradePath: ${(run.upgradePath || []).join(" > ") || "none"}`,
     `advice: ${getRunAdvice(run)}`,
     `breakdown: ${Object.entries(getBuildBreakdown(run)).map(([label, value]) => `${label}=${value}`).join(" ")}`,
+    `chronology: ${(run.chronology || []).join(" | ") || "none"}`,
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
   ];
   return lines.join("\n");

@@ -70,6 +70,7 @@ export class GameScene extends Phaser.Scene {
   private upgradesTaken = 0;
   private bossesDefeated = 0;
   private upgradePath: string[] = [];
+  private chronology: string[] = [];
   private damageTaken = 0;
   private damageAttrition = 0;
   private damageBurst = 0;
@@ -251,6 +252,7 @@ export class GameScene extends Phaser.Scene {
     this.upgradesTaken = 0;
     this.bossesDefeated = 0;
     this.upgradePath = [];
+    this.chronology = [];
     this.damageTaken = 0;
     this.damageAttrition = 0;
     this.damageBurst = 0;
@@ -320,6 +322,7 @@ export class GameScene extends Phaser.Scene {
       this.boss = new Boss1Controller(this, this.elapsedMs, threat, bossId, finalApex ? 4 : 1);
       this.bossEncountersSpawned += 1;
       this.activeBossStartedAt = this.elapsedMs;
+      this.recordChronology(`Boss ${bossId} spawned`);
       this.telemetry?.logEvent(this.elapsedMs, "boss-spawn", { threat, bossId, finalApex });
       this.maybeShake(240, 0.004);
       playSound("upgrade");
@@ -565,6 +568,7 @@ export class GameScene extends Phaser.Scene {
       playSound(result.phaseChanged ? "upgrade" : "enemy-hit");
       if (result.phaseChanged) {
         this.telemetry?.logEvent(this.elapsedMs, "boss-phase", { phase: this.boss.phase });
+        this.recordChronology(`Boss ${this.boss.bossId} phase ${this.boss.phase}`);
         this.maybeShake(180, 0.003);
       }
       if (result.defeated) {
@@ -589,6 +593,7 @@ export class GameScene extends Phaser.Scene {
     this.activeBossStartedAt = null;
     this.score += 250;
     this.bossesDefeated += 1;
+    this.recordChronology(`Boss ${this.bossEncountersSpawned} defeated`);
     if (this.finalApexActive) {
       this.nextBossAt = Number.POSITIVE_INFINITY;
       this.finalApexActive = false;
@@ -769,6 +774,7 @@ export class GameScene extends Phaser.Scene {
       speed: this.stats.speed,
       finalThreat: this.getThreatLevel(),
       upgradePath: [...this.upgradePath],
+      chronology: [...this.chronology],
       damageTaken: this.damageTaken,
       damageAttrition: this.damageAttrition,
       damageBurst: this.damageBurst,
@@ -847,6 +853,10 @@ export class GameScene extends Phaser.Scene {
     if (this.health <= 0) this.endRun();
   }
 
+  private recordChronology(label: string) {
+    this.chronology.push(`${(this.elapsedMs / 1000).toFixed(1)}s · ${label}`);
+  }
+
   private recordTelemetrySample() {
     if (!this.telemetry) return;
     const autoplayer = this.autoplayer.getTelemetrySnapshot();
@@ -899,6 +909,7 @@ export class GameScene extends Phaser.Scene {
     this.health = result.health;
     this.upgradesTaken += 1;
     this.upgradePath.push(getUpgradeTitle(id));
+    this.recordChronology(`Upgrade ${getUpgradeTitle(id)}`);
     this.nextUpgradeAt += UPGRADE_INTERVAL_MS;
     this.telemetry?.logEvent(this.elapsedMs, "upgrade-picked", {
       id,
