@@ -163,6 +163,7 @@ const debugToggle = mustGetButton("debug-toggle");
 const debugClose = mustGetButton("debug-close");
 const debugPanel = mustGet("debug-panel");
 const debugStats = mustGet("debug-stats");
+const toastStack = mustGet("toast-stack");
 
 const debugControls = {
   enabled: mustGetInput("debug-enabled"),
@@ -201,6 +202,7 @@ let selectedBoardRun: RunRecord | null = null;
 let telemetryFilterValue = "";
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
+let toastId = 0;
 
 if (automationConfig.autoplayer) localStorage.setItem(AUTOPLAYER_KEY, "true");
 playerNameInput.value = getSavedName();
@@ -226,9 +228,9 @@ tutorialButton.addEventListener("click", () => showTutorial());
 dailySeedCopy.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(dailySeedPreview.textContent || dailySeed());
-    submitStatus.textContent = "Daily seed copied.";
+    showToast("Daily seed copied.", "success");
   } catch {
-    submitStatus.textContent = dailySeedPreview.textContent || dailySeed();
+    showToast("Daily seed copy failed.", "error");
   }
 });
 bindUp.addEventListener("click", () => beginKeybindCapture("moveUp"));
@@ -255,9 +257,9 @@ copySeedButton.addEventListener("click", async () => {
   if (!lastRun) return;
   try {
     await navigator.clipboard.writeText(lastRun.seed);
-    submitStatus.textContent = "Seed copied.";
+    showToast("Seed copied.", "success");
   } catch {
-    submitStatus.textContent = lastRun.seed;
+    showToast("Seed copy failed.", "error");
   }
 });
 copyLinkButton.addEventListener("click", async () => {
@@ -265,9 +267,9 @@ copyLinkButton.addEventListener("click", async () => {
   const link = buildReplayLink(lastRun);
   try {
     await navigator.clipboard.writeText(link);
-    submitStatus.textContent = "Replay link copied.";
+    showToast("Replay link copied.", "success");
   } catch {
-    submitStatus.textContent = link;
+    showToast("Replay link copy failed.", "error");
   }
 });
 copyReportButton.addEventListener("click", async () => {
@@ -275,9 +277,9 @@ copyReportButton.addEventListener("click", async () => {
   const report = buildRunReport(lastRun);
   try {
     await navigator.clipboard.writeText(report);
-    submitStatus.textContent = "Run report copied.";
+    showToast("Run report copied.", "success");
   } catch {
-    submitStatus.textContent = report;
+    showToast("Run report copy failed.", "error");
   }
 });
 recentRunsList.addEventListener("click", (event) => {
@@ -298,9 +300,9 @@ selectedRunCopySeed.addEventListener("click", async () => {
   if (!selectedRecentRun) return;
   try {
     await navigator.clipboard.writeText(selectedRecentRun.seed);
-    submitStatus.textContent = "Selected seed copied.";
+    showToast("Selected seed copied.", "success");
   } catch {
-    submitStatus.textContent = selectedRecentRun.seed;
+    showToast("Selected seed copy failed.", "error");
   }
 });
 selectedRunCopyLink.addEventListener("click", async () => {
@@ -308,9 +310,9 @@ selectedRunCopyLink.addEventListener("click", async () => {
   const link = buildRunLink(selectedRecentRun);
   try {
     await navigator.clipboard.writeText(link);
-    submitStatus.textContent = "Selected run link copied.";
+    showToast("Selected run link copied.", "success");
   } catch {
-    submitStatus.textContent = link;
+    showToast("Selected run link copy failed.", "error");
   }
 });
 restartButton.addEventListener("click", () => startRun(currentMode));
@@ -345,9 +347,9 @@ selectedBoardCopySeed.addEventListener("click", async () => {
   if (!selectedBoardRun) return;
   try {
     await navigator.clipboard.writeText(selectedBoardRun.seed);
-    submitStatus.textContent = "Leaderboard seed copied.";
+    showToast("Leaderboard seed copied.", "success");
   } catch {
-    submitStatus.textContent = selectedBoardRun.seed;
+    showToast("Leaderboard seed copy failed.", "error");
   }
 });
 selectedBoardCopyLink.addEventListener("click", async () => {
@@ -355,9 +357,9 @@ selectedBoardCopyLink.addEventListener("click", async () => {
   const link = buildRunLink(selectedBoardRun);
   try {
     await navigator.clipboard.writeText(link);
-    submitStatus.textContent = "Leaderboard link copied.";
+    showToast("Leaderboard link copied.", "success");
   } catch {
-    submitStatus.textContent = link;
+    showToast("Leaderboard link copy failed.", "error");
   }
 });
 submitButton.addEventListener("click", submitCurrentRun);
@@ -388,6 +390,7 @@ telemetryArchiveClear.addEventListener("click", () => {
   renderTelemetryArchive();
   renderTelemetryTimeline();
   renderRunFeed();
+  showToast("Telemetry archive cleared.", "success");
 });
 telemetryFilter.addEventListener("input", () => {
   telemetryFilterValue = telemetryFilter.value.trim().toLowerCase();
@@ -400,27 +403,35 @@ profileBackupExport.addEventListener("click", () => {
   profileBackup.value = JSON.stringify(backup, null, 2);
   profileBackupStatus.textContent = `Exported ${new Date(backup.savedAt).toLocaleString()}.`;
   renderBackupSavedAt(backup.savedAt);
+  showToast("Profile exported.", "success");
 });
 profileBackupImport.addEventListener("click", () => {
   const result = importProfileBackup(profileBackup.value);
   if (!result.ok) {
     profileBackupStatus.textContent = result.error || "Import failed.";
+    showToast(result.error || "Profile import failed.", "error");
     return;
   }
   syncProfileFromStorage();
   profileBackupStatus.textContent = "Profile restored.";
   renderBackupSavedAt(new Date().toISOString());
+  showToast("Profile restored.", "success");
 });
 profileBackupCopy.addEventListener("click", async () => {
   if (!profileBackup.value.trim()) profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
   try {
     await navigator.clipboard.writeText(profileBackup.value);
     profileBackupStatus.textContent = "Backup copied.";
+    showToast("Backup copied.", "success");
   } catch {
     profileBackupStatus.textContent = "Copy failed. Use the text box manually.";
+    showToast("Backup copy failed.", "error");
   }
 });
-profileResetAll.addEventListener("click", () => resetAllLocalData());
+profileResetAll.addEventListener("click", () => {
+  resetAllLocalData();
+  showToast("Local data reset.", "success");
+});
 tutorialClose.addEventListener("click", () => {
   currentTutorial = markTutorialSeen(!tutorialDontShow.checked);
   refreshTutorialUi();
@@ -1389,6 +1400,7 @@ async function syncNow() {
   syncStatusSummary.textContent = "Trying to sync pending runs now.";
   await syncPendingRuns();
   renderSyncStatusPanel();
+  showToast("Sync complete.", "success");
 }
 
 function resetAllLocalData() {
@@ -1488,8 +1500,10 @@ async function copyLatestTelemetryLog() {
   try {
     await navigator.clipboard.writeText(entry.logText);
     telemetryArchiveSummary.textContent = telemetryFilterValue ? "Filtered telemetry log copied." : "Latest telemetry log copied.";
+    showToast(telemetryFilterValue ? "Filtered telemetry log copied." : "Latest telemetry log copied.", "success");
   } catch {
     telemetryArchiveSummary.textContent = entry.logText;
+    showToast("Telemetry log copy failed.", "error");
   }
 }
 
@@ -1503,6 +1517,25 @@ function downloadLatestTelemetryLog() {
   anchor.download = telemetryFilterValue ? `${entry.runId}.filtered.log` : `${entry.runId}.log`;
   anchor.click();
   URL.revokeObjectURL(url);
+  showToast(telemetryFilterValue ? "Filtered telemetry log downloaded." : "Latest telemetry log downloaded.", "success");
+}
+
+function showToast(message: string, tone: "info" | "success" | "error" = "info") {
+  const toast = document.createElement("div");
+  const toneClass = tone === "success"
+    ? "border-emerald-400/40 bg-emerald-950/95 text-emerald-100"
+    : tone === "error"
+      ? "border-rose-400/40 bg-rose-950/95 text-rose-100"
+      : "border-line bg-slate-950/95 text-slate-100";
+  toast.className = `pointer-events-auto rounded-md border px-3 py-2 text-sm font-semibold shadow-2xl backdrop-blur ${toneClass}`;
+  toast.textContent = message;
+  const id = ++toastId;
+  toast.dataset.toastId = String(id);
+  toastStack.prepend(toast);
+  window.setTimeout(() => {
+    const current = toastStack.querySelector(`[data-toast-id="${id}"]`);
+    if (current) current.remove();
+  }, 2600);
 }
 
 function buildReplayLink(run: Pick<RunSummary, "mode" | "seed">) {

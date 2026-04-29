@@ -9,6 +9,7 @@
     <div id="app" class="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_20%_10%,rgba(94,234,212,.12),transparent_32%),radial-gradient(circle_at_80%_0%,rgba(251,113,133,.10),transparent_28%),#07090f]">
       <div id="game-shell" class="relative mx-auto flex min-h-screen max-w-[1800px] items-center justify-center p-3 sm:p-6">
         <div id="game-container" class="relative aspect-[16/9] w-full max-w-[1600px] overflow-hidden rounded-lg border border-line bg-black shadow-glow"></div>
+        <div id="toast-stack" aria-live="polite" aria-atomic="true" class="pointer-events-none fixed right-4 top-4 z-50 flex w-[min(92vw,22rem)] flex-col gap-2 sm:right-6 sm:top-6"></div>
         <div id="hud" class="pointer-events-none absolute left-1/2 top-5 hidden w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 grid-cols-4 gap-2 sm:top-8 sm:gap-3">
           <div class="hud-tile">
             <span class="hud-label">Time</span>
