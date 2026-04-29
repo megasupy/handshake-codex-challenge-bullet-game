@@ -1,17 +1,19 @@
 import Phaser from "phaser";
-import { ARENA_WIDTH } from "./constants";
+import { ARENA_HEIGHT, ARENA_WIDTH } from "./constants";
 import type { DebugSettings } from "./events";
 import { enemyDeathBurst } from "./effects";
 import { fireEnemyBullet } from "./projectiles";
 
 export const FIRST_BOSS_AT_MS = 60000;
 export const SECOND_BOSS_AT_MS = 120000;
+export const THIRD_BOSS_AT_MS = 180000;
 export const BOSS_RESPAWN_DELAY_MS = 60000;
 
 type Phase = 1 | 2 | 3;
 
 export class Boss1Controller {
-  readonly name = "The Red Vector";
+  readonly name: string;
+  readonly bossId: 1 | 2 | 3;
   readonly maxHp: number;
   hp: number;
   phase: Phase = 1;
@@ -25,29 +27,33 @@ export class Boss1Controller {
   private hitFlashUntil = 0;
   private attackIndex = 0;
   private view: Phaser.GameObjects.Graphics;
+  private currentPatternId = "idle";
 
-  constructor(private readonly scene: Phaser.Scene, elapsedMs: number, threat: number) {
+  constructor(private readonly scene: Phaser.Scene, elapsedMs: number, threat: number, bossId: 1 | 2 | 3) {
     this.bornAt = elapsedMs;
-    this.maxHp = 450 + threat * 25;
+    this.bossId = bossId;
+    this.name = bossId === 1 ? "Vector Regent" : bossId === 2 ? "Lane Warden" : "Apex Engine";
+    const hpBase = bossId === 1 ? 420 : bossId === 2 ? 560 : 760;
+    this.maxHp = hpBase + Math.floor(threat * 22);
     this.hp = this.maxHp;
-    this.phaseDamageRequired = [this.maxHp * 0.22, this.maxHp * 0.28, this.maxHp * 0.5];
-    this.attackAt = elapsedMs + 900;
+    this.phaseDamageRequired = [this.maxHp * 0.28, this.maxHp * 0.32, this.maxHp * 0.4];
+    this.attackAt = elapsedMs + 850;
     this.view = scene.add.graphics();
     this.redraw(elapsedMs);
   }
 
   update(elapsedMs: number, player: Phaser.GameObjects.Shape, enemyBullets: Phaser.Physics.Arcade.Group, debug: DebugSettings) {
     const t = (elapsedMs - this.bornAt) / 1000;
-    const lane = this.phase === 1 ? 80 : this.phase === 2 ? 120 : 150;
-    const motion = this.phase === 1 ? 0.18 : this.phase === 2 ? 0.24 : 0.3;
-    this.x = Phaser.Math.Clamp(ARENA_WIDTH / 2 + Math.sin(t * motion) * lane, 120, ARENA_WIDTH - 120);
-    this.y = 122 + Math.cos(t * (motion + 0.06)) * 12;
+    this.updateMovement(t);
     this.redraw(elapsedMs);
-
     if (elapsedMs < this.attackAt) return;
     this.firePattern(player, enemyBullets, debug, t);
     this.attackIndex += 1;
     this.attackAt = elapsedMs + this.getAttackCooldownMs();
+  }
+
+  getPatternId(): string {
+    return `b${this.bossId}-p${this.phase}-${this.currentPatternId}`;
   }
 
   hitByShot(shot: Phaser.Physics.Arcade.Image, elapsedMs: number): { hit: boolean; defeated: boolean; phaseChanged: boolean } {
@@ -66,7 +72,6 @@ export class Boss1Controller {
     const phaseRequirement = this.phaseDamageRequired[this.phase - 1];
     const remaining = Math.max(0, phaseRequirement - this.phaseDamage);
     const applied = this.phase < 3 ? Math.min(damage, remaining) : damage;
-
     this.hp = Math.max(0, this.hp - applied);
     this.phaseDamage += applied;
     this.hitFlashUntil = elapsedMs + 50;
@@ -76,13 +81,11 @@ export class Boss1Controller {
       this.phaseDamage = 0;
       return { hit: true, defeated: false, phaseChanged: true };
     }
-
     return { hit: true, defeated: this.hp <= 0, phaseChanged: false };
   }
 
   overlapsPlayer(playerX: number, playerY: number, playerRadius: number): boolean {
-    const bossRadius = 44;
-    const minDist = bossRadius + playerRadius;
+    const minDist = 44 + playerRadius;
     return Phaser.Math.Distance.Squared(this.x, this.y, playerX, playerY) <= minDist * minDist;
   }
 
@@ -91,71 +94,130 @@ export class Boss1Controller {
     this.view.destroy();
   }
 
+  private updateMovement(t: number) {
+    if (this.bossId === 1) {
+      this.x = Phaser.Math.Clamp(ARENA_WIDTH / 2 + Math.sin(t * 0.3) * 96, 130, ARENA_WIDTH - 130);
+      this.y = 124 + Math.cos(t * 0.2) * 10;
+      return;
+    }
+    if (this.bossId === 2) {
+      const move = this.phase === 1 ? 0 : this.phase === 2 ? 0.12 : 0.08;
+      this.x = Phaser.Math.Clamp(ARENA_WIDTH / 2 + Math.sin(t * move) * 70, 140, ARENA_WIDTH - 140);
+      this.y = 128;
+      return;
+    }
+    this.x = Phaser.Math.Clamp(ARENA_WIDTH / 2 + Math.sin(t * 0.16) * 54, 150, ARENA_WIDTH - 150);
+    this.y = 128 + Math.cos(t * 0.11) * 8;
+  }
+
   private firePattern(player: Phaser.GameObjects.Shape, enemyBullets: Phaser.Physics.Arcade.Group, debug: DebugSettings, t: number) {
-    const base = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
-    const orbit = t * 1.1;
-    const emitters = [
-      { x: this.x + Math.cos(orbit) * 52, y: this.y + Math.sin(orbit) * 52 },
-      { x: this.x + Math.cos(orbit + Math.PI) * 52, y: this.y + Math.sin(orbit + Math.PI) * 52 },
-    ];
+    if (this.bossId === 1) this.fireBoss1(player, enemyBullets, debug, t);
+    else if (this.bossId === 2) this.fireBoss2(player, enemyBullets, debug, t);
+    else this.fireBoss3(player, enemyBullets, debug, t);
+  }
 
+  private fireBoss1(player: Phaser.GameObjects.Shape, enemyBullets: Phaser.Physics.Arcade.Group, debug: DebugSettings, t: number) {
+    const aim = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
     if (this.phase === 1) {
-      for (const offset of [-0.36, -0.2, -0.08, 0.08, 0.2, 0.36]) {
-        fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, base + offset, 118, debug);
-      }
-      const ring = 14;
-      const spin = t * 0.95 + (this.attackIndex % 2 === 0 ? 0 : Math.PI / ring);
-      for (let i = 0; i < ring; i += 1) {
-        const e = emitters[i % 2];
-        fireEnemyBullet(this.scene, enemyBullets, e.x, e.y, spin + (Math.PI * 2 * i) / ring, 104 + (i % 3) * 7, debug);
+      this.currentPatternId = "aim-fan+ring";
+      for (const offset of [-0.28, -0.12, 0, 0.12, 0.28]) fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, aim + offset, 140, debug);
+      if (this.attackIndex % 2 === 0) {
+        for (let i = 0; i < 10; i += 1) fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, t * 0.7 + (Math.PI * 2 * i) / 10, 124, debug);
       }
       return;
     }
-
     if (this.phase === 2) {
-      const dualSpiralCount = 10;
-      const spin = t * 1.35;
-      for (let i = 0; i < dualSpiralCount; i += 1) {
-        fireEnemyBullet(this.scene, enemyBullets, emitters[0].x, emitters[0].y, spin + (Math.PI * 2 * i) / dualSpiralCount, 114 + i * 2, debug);
-        fireEnemyBullet(this.scene, enemyBullets, emitters[1].x, emitters[1].y, -spin + (Math.PI * 2 * i) / dualSpiralCount, 114 + i * 2, debug);
-      }
-      const fan = 7;
-      const fanStep = 0.12;
-      const fanStart = -((fan - 1) * fanStep) / 2;
-      for (let i = 0; i < fan; i += 1) {
-        fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, base + fanStart + i * fanStep, 136 + i * 3, debug);
-      }
+      this.currentPatternId = "sweep-arcs";
+      const sweep = (this.attackIndex % 4) * 0.16 - 0.24;
+      for (let i = 0; i < 8; i += 1) fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, aim + sweep + (i - 3.5) * 0.11, 152 + i * 2, debug);
       return;
     }
-
-    const barrage = 16;
-    const sweep = t * 0.8;
-    for (let i = 0; i < barrage; i += 1) {
-      fireEnemyBullet(this.scene, enemyBullets, emitters[0].x, emitters[0].y, sweep + (Math.PI * 2 * i) / barrage, 132 + (i % 4) * 8, debug);
-      fireEnemyBullet(this.scene, enemyBullets, emitters[1].x, emitters[1].y, -sweep + (Math.PI * 2 * i) / barrage, 132 + (i % 4) * 8, debug);
-    }
-    const lanes = 9;
-    for (let i = 0; i < lanes; i += 1) {
-      const offset = (i - (lanes - 1) / 2) * 0.1;
-      fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, base + offset, 158 + i * 3, debug);
-    }
-    if (this.attackIndex % 2 === 0) {
-      const wall = 12;
-      for (let i = 0; i < wall; i += 1) {
-        fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, (Math.PI * 2 * i) / wall + t * 0.45, 124, debug);
-      }
+    this.currentPatternId = "dual-spiral";
+    for (let i = 0; i < 14; i += 1) {
+      fireEnemyBullet(this.scene, enemyBullets, this.x - 30, this.y, t * 1.2 + (Math.PI * 2 * i) / 14, 144 + (i % 3) * 6, debug);
+      fireEnemyBullet(this.scene, enemyBullets, this.x + 30, this.y, -t * 1.2 + (Math.PI * 2 * i) / 14, 144 + (i % 3) * 6, debug);
     }
   }
 
+  private fireBoss2(player: Phaser.GameObjects.Shape, enemyBullets: Phaser.Physics.Arcade.Group, debug: DebugSettings, t: number) {
+    const aim = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
+    if (this.phase === 1) {
+      this.currentPatternId = "lane-walls";
+      const gaps = [ARENA_WIDTH * 0.2, ARENA_WIDTH * 0.5, ARENA_WIDTH * 0.8];
+      const gap = gaps[this.attackIndex % gaps.length];
+      for (let i = 0; i <= 14; i += 1) {
+        const x = 30 + i * ((ARENA_WIDTH - 60) / 14);
+        if (Math.abs(x - gap) < 70) continue;
+        const angle = Phaser.Math.Angle.Between(x, 40, x, ARENA_HEIGHT - 20);
+        fireEnemyBullet(this.scene, enemyBullets, x, 40, angle, 146, debug);
+      }
+      return;
+    }
+    if (this.phase === 2) {
+      this.currentPatternId = "orbiter-bursts";
+      const orbit = t * 1.1;
+      for (const phaseOffset of [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5]) {
+        const ex = this.x + Math.cos(orbit + phaseOffset) * 92;
+        const ey = this.y + Math.sin(orbit + phaseOffset) * 68;
+        for (let i = -1; i <= 1; i += 1) fireEnemyBullet(this.scene, enemyBullets, ex, ey, aim + i * 0.14, 156, debug);
+      }
+      return;
+    }
+    this.currentPatternId = "box-collapse";
+    const inset = 40 + (this.attackIndex % 4) * 22;
+    for (let i = 0; i < 10; i += 1) {
+      const tx = inset + i * ((ARENA_WIDTH - inset * 2) / 9);
+      fireEnemyBullet(this.scene, enemyBullets, tx, 30, Math.PI / 2, 154, debug);
+      fireEnemyBullet(this.scene, enemyBullets, tx, ARENA_HEIGHT - 30, -Math.PI / 2, 154, debug);
+    }
+  }
+
+  private fireBoss3(player: Phaser.GameObjects.Shape, enemyBullets: Phaser.Physics.Arcade.Group, debug: DebugSettings, t: number) {
+    const aim = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
+    if (this.phase === 1) {
+      this.currentPatternId = "precision-lanes";
+      for (let i = -3; i <= 3; i += 1) fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, aim + i * 0.09, 172 + Math.abs(i) * 4, debug);
+      return;
+    }
+    if (this.phase === 2) {
+      this.currentPatternId = "counter-rotors";
+      for (let i = 0; i < 16; i += 1) {
+        fireEnemyBullet(this.scene, enemyBullets, this.x - 36, this.y, t * 1.35 + (Math.PI * 2 * i) / 16, 148 + (i % 4) * 8, debug);
+        fireEnemyBullet(this.scene, enemyBullets, this.x + 36, this.y, -t * 1.35 + (Math.PI * 2 * i) / 16, 148 + (i % 4) * 8, debug);
+      }
+      return;
+    }
+    const cycle = this.attackIndex % 3;
+    if (cycle === 0) {
+      this.currentPatternId = "ring-compress";
+      for (let i = 0; i < 20; i += 1) fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, (Math.PI * 2 * i) / 20, 178, debug);
+      return;
+    }
+    if (cycle === 1) {
+      this.currentPatternId = "diag-sweep";
+      for (let i = 0; i < 12; i += 1) {
+        const x = 30 + i * ((ARENA_WIDTH - 60) / 11);
+        fireEnemyBullet(this.scene, enemyBullets, x, 32, Math.PI * 0.63, 164, debug);
+      }
+      return;
+    }
+    this.currentPatternId = "gap-chase";
+    for (let i = -4; i <= 4; i += 1) fireEnemyBullet(this.scene, enemyBullets, this.x, this.y, aim + i * 0.07, 186, debug);
+  }
+
   private getAttackCooldownMs(): number {
-    if (this.phase === 1) return 900;
-    if (this.phase === 2) return 680;
-    return 520;
+    if (this.bossId === 1) return this.phase === 1 ? 860 : this.phase === 2 ? 680 : 560;
+    if (this.bossId === 2) return this.phase === 1 ? 980 : this.phase === 2 ? 760 : 620;
+    return this.phase === 1 ? 760 : this.phase === 2 ? 600 : 520;
   }
 
   private redraw(elapsedMs: number) {
     const flash = elapsedMs < this.hitFlashUntil;
-    const color = flash ? 0xffffff : this.phase === 1 ? 0xb91c1c : this.phase === 2 ? 0xea580c : 0xdc2626;
+    const color =
+      flash ? 0xffffff :
+        this.bossId === 1 ? (this.phase === 1 ? 0xb91c1c : this.phase === 2 ? 0xea580c : 0xdc2626) :
+          this.bossId === 2 ? (this.phase === 1 ? 0x9333ea : this.phase === 2 ? 0x7c3aed : 0x6d28d9) :
+            (this.phase === 1 ? 0x0ea5e9 : this.phase === 2 ? 0x0284c7 : 0x0369a1);
     const size = flash ? 98 : 92;
     this.view.clear();
     this.view.lineStyle(4, 0xffffff, 0.92);

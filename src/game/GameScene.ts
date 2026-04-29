@@ -3,11 +3,11 @@ import type { GameMode, RunSummary } from "../types";
 import { createArenaBackground, createGameTextures } from "./arena";
 import { Autoplayer } from "./autoplayer";
 import { playSound } from "./audio";
-import { BOSS_RESPAWN_DELAY_MS, Boss1Controller, FIRST_BOSS_AT_MS, SECOND_BOSS_AT_MS } from "./boss1";
+import { BOSS_RESPAWN_DELAY_MS, Boss1Controller, FIRST_BOSS_AT_MS, SECOND_BOSS_AT_MS, THIRD_BOSS_AT_MS } from "./boss1";
 import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_DEBUG_SETTINGS, DEFAULT_PLAYER_STATS, TELEMETRY_SAMPLE_INTERVAL_MS, UPGRADE_INTERVAL_MS } from "./constants";
 import { applyDebugSettings as mergeDebugSettings } from "./debug";
 import { dashTrail, enemyDeathBurst, flashEnemy, pickupCollectBurst, playerHitBurst, upgradePulse } from "./effects";
-import { createPickup, firePattern, spawnEnemyIfReady, updateEnemies } from "./enemies";
+import { createPickup, firePattern, getEnemyWaveStep, spawnEnemyIfReady, updateEnemies } from "./enemies";
 import { emitAutomationComplete, emitAutomationSnapshot, emitBossHud, emitDebugStats, emitGameOver, emitHud, emitUpgrade, type DebugSettings } from "./events";
 import type { EnemyData } from "./gameTypes";
 import { magnetPickups } from "./pickups";
@@ -117,12 +117,15 @@ export class GameScene extends Phaser.Scene {
     this.autoShoot();
     this.updateBossFlow(threat);
     if (!this.boss) {
+      const phaseId = this.getEnemyPhaseId();
       this.spawnAt = spawnEnemyIfReady({
         scene: this,
         enemies: this.enemies,
         rng: this.rng,
         player: this.player,
         elapsedMs: this.elapsedMs,
+        elapsedInPhaseMs: this.getEnemyPhaseElapsedMs(),
+        phaseId,
         spawnAt: this.spawnAt,
         threat,
         debug: this.debug,
@@ -136,6 +139,7 @@ export class GameScene extends Phaser.Scene {
       elapsedMs: this.elapsedMs,
       threat,
       debug: this.debug,
+      rng: this.rng,
     });
     updateProjectiles(this.playerShots);
     updateProjectiles(this.enemyBullets);
@@ -172,7 +176,10 @@ export class GameScene extends Phaser.Scene {
       this.boss.destroy();
       this.boss = null;
       this.activeBossStartedAt = null;
-      this.nextBossAt = this.bossEncountersSpawned < 2 ? SECOND_BOSS_AT_MS : this.elapsedMs + 3000;
+      this.nextBossAt =
+        this.bossEncountersSpawned === 1 ? SECOND_BOSS_AT_MS :
+          this.bossEncountersSpawned === 2 ? THIRD_BOSS_AT_MS :
+            this.elapsedMs + 3000;
       this.emitBossState();
     }
   }
@@ -252,10 +259,11 @@ export class GameScene extends Phaser.Scene {
       this.enemies.clear(true, true);
       this.physics.resume();
       this.pausedForUpgrade = false;
-      this.boss = new Boss1Controller(this, this.elapsedMs, threat);
+      const bossId = Math.min(3, this.bossEncountersSpawned + 1) as 1 | 2 | 3;
+      this.boss = new Boss1Controller(this, this.elapsedMs, threat, bossId);
       this.bossEncountersSpawned += 1;
       this.activeBossStartedAt = this.elapsedMs;
-      this.telemetry?.logEvent(this.elapsedMs, "boss-spawn", { threat });
+      this.telemetry?.logEvent(this.elapsedMs, "boss-spawn", { threat, bossId });
       this.cameras.main.shake(240, 0.004);
       playSound("upgrade");
     }
@@ -456,7 +464,10 @@ export class GameScene extends Phaser.Scene {
     this.boss = null;
     this.activeBossStartedAt = null;
     this.score += 250;
-    this.nextBossAt = this.bossEncountersSpawned < 2 ? SECOND_BOSS_AT_MS : this.elapsedMs + BOSS_RESPAWN_DELAY_MS;
+    this.nextBossAt =
+      this.bossEncountersSpawned === 1 ? SECOND_BOSS_AT_MS :
+        this.bossEncountersSpawned === 2 ? THIRD_BOSS_AT_MS :
+          this.elapsedMs + BOSS_RESPAWN_DELAY_MS;
     this.spawnAt = this.elapsedMs + 1200;
     playSound("enemy-death");
     this.emitBossState();
@@ -525,6 +536,19 @@ export class GameScene extends Phaser.Scene {
   private getThreatLevel(): number {
     if (this.debug.threatOverride > 0) return this.debug.threatOverride;
     return Math.max(1, Math.floor(this.elapsedMs / 7500) + 1);
+  }
+
+  private getEnemyPhaseId(): 1 | 2 | 3 {
+    if (this.bossEncountersSpawned <= 0) return 1;
+    if (this.bossEncountersSpawned === 1) return 2;
+    return 3;
+  }
+
+  private getEnemyPhaseElapsedMs(): number {
+    const phaseId = this.getEnemyPhaseId();
+    if (phaseId === 1) return this.elapsedMs;
+    if (phaseId === 2) return Math.max(0, this.elapsedMs - FIRST_BOSS_AT_MS);
+    return Math.max(0, this.elapsedMs - SECOND_BOSS_AT_MS);
   }
 
   private getScaledPlayerDamage(): number {
@@ -653,6 +677,9 @@ export class GameScene extends Phaser.Scene {
     if (!this.telemetry) return;
     const autoplayer = this.autoplayer.getTelemetrySnapshot();
     const body = this.player.body as Phaser.Physics.Arcade.Body;
+    const phaseId = this.boss ? Math.min(6, this.bossEncountersSpawned * 2) : Math.min(5, this.bossEncountersSpawned * 2 + 1);
+    const waveStep = this.boss ? this.boss.phase : getEnemyWaveStep(this.getEnemyPhaseId(), this.getEnemyPhaseElapsedMs());
+    const bossPatternId = this.boss ? this.boss.getPatternId() : "none";
     this.telemetry.sample(this.elapsedMs, this.telemetryConfig.sampleIntervalMs, this.telemetryConfig.snapshotIntervalMs, {
       x: round(this.player.x),
       y: round(this.player.y),
@@ -678,6 +705,9 @@ export class GameScene extends Phaser.Scene {
       shotsFired: this.playerShotsFired,
       shotsHit: this.playerShotsHit,
       shotAccuracy: this.playerShotsFired > 0 ? round(this.playerShotsHit / this.playerShotsFired) : 0,
+      phaseId,
+      waveStep,
+      bossPatternId,
       ...toAutoplayerSample(autoplayer),
     });
     if (this.telemetryConfig.exportToDom) {

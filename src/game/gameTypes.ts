@@ -1,4 +1,4 @@
-export type EnemyKind = "chaser" | "shooter" | "spinner" | "bomber";
+export type EnemyKind = "chaser" | "shooter" | "spinner" | "bomber" | "strafer" | "mine" | "sniper" | "summoner" | "minion";
 
 export type EnemyData = {
   kind: EnemyKind;

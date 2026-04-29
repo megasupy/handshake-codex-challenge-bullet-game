@@ -48,6 +48,9 @@ export type TelemetrySample = {
   shotsFired: number;
   shotsHit: number;
   shotAccuracy: number;
+  phaseId: number;
+  waveStep: number;
+  bossPatternId: string;
 };
 
 export type TelemetryRun = {
@@ -156,6 +159,9 @@ export class TelemetryRecorder {
       `shots=${sample.shotsFired}`,
       `hits=${sample.shotsHit}`,
       `acc=${sample.shotAccuracy}`,
+      `phase=${sample.phaseId}`,
+      `wave=${sample.waveStep}`,
+      `pattern=${sample.bossPatternId}`,
     ].join(" ");
   }
 }
