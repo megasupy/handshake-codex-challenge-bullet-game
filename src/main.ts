@@ -97,6 +97,9 @@ const telemetryArchiveClear = mustGetButton("telemetry-archive-clear");
 const telemetryTimelineCount = mustGet("telemetry-timeline-count");
 const telemetryTimelineSummary = mustGet("telemetry-timeline-summary");
 const telemetryTimelineList = mustGet("telemetry-timeline-list");
+const runFeedCount = mustGet("run-feed-count");
+const runFeedSummary = mustGet("run-feed-summary");
+const runFeedList = mustGet("run-feed-list");
 const profileBackup = mustGet("profile-backup") as HTMLTextAreaElement;
 const profileBackupExport = mustGetButton("profile-backup-export");
 const profileBackupImport = mustGetButton("profile-backup-import");
@@ -257,6 +260,8 @@ telemetryArchiveClear.addEventListener("click", () => {
   clearTelemetryArchive();
   currentTelemetryArchive = [];
   renderTelemetryArchive();
+  renderTelemetryTimeline();
+  renderRunFeed();
 });
 profileBackupExport.addEventListener("click", () => {
   const backup = exportProfileBackup();
@@ -432,6 +437,7 @@ gameEvents.addEventListener("automation-complete", (event) => {
   currentTelemetryArchive = saveTelemetryRun(detail.run);
   renderTelemetryArchive();
   renderTelemetryTimeline();
+  renderRunFeed();
   renderSyncStatusPanel();
   publishAutomationResult(detail.run, true);
 });
@@ -450,6 +456,7 @@ renderRecentRunsPanel();
 renderAchievementsPanel();
 renderSyncStatusPanel();
 renderTelemetryTimeline();
+renderRunFeed();
 refreshCheckpointUi();
 renderTelemetryArchive();
 profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
@@ -994,6 +1001,88 @@ function renderTelemetryTimeline() {
     item.textContent = line;
     telemetryTimelineList.append(item);
   }
+}
+
+function renderRunFeed() {
+  const entry = currentTelemetryArchive[0];
+  if (!entry) {
+    runFeedCount.textContent = "0 events";
+    runFeedSummary.textContent = "Major run milestones from the latest saved telemetry log.";
+    runFeedList.innerHTML = `<li class="rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400">No event feed yet.</li>`;
+    return;
+  }
+
+  const events = entry.logText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.includes("EVENT"))
+    .map((line) => formatTelemetryEventLine(line))
+    .filter((line): line is string => Boolean(line));
+
+  const slice = events.slice(-8);
+  runFeedCount.textContent = `${slice.length} event${slice.length === 1 ? "" : "s"}`;
+  runFeedSummary.textContent = `Latest run: ${formatTelemetryArchiveEntry(entry)}`;
+  runFeedList.innerHTML = "";
+
+  if (slice.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
+    empty.textContent = "No readable events yet.";
+    runFeedList.append(empty);
+    return;
+  }
+
+  for (const event of slice) {
+    const item = document.createElement("li");
+    item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-xs leading-5 text-slate-300";
+    item.textContent = event;
+    runFeedList.append(item);
+  }
+}
+
+function formatTelemetryEventLine(line: string): string | null {
+  const match = line.match(/^\[(?<time>[^\]]+)\]\s+EVENT\s+(?<type>\S+)(?<rest>.*)$/);
+  if (!match?.groups) return null;
+  const time = match.groups.time.trim();
+  const type = match.groups.type.trim();
+  const rest = match.groups.rest.trim();
+  const data: Record<string, string> = {};
+  for (const part of rest.split(" ").map((value) => value.trim()).filter(Boolean)) {
+    const [key, ...values] = part.split("=");
+    if (!key || values.length === 0) continue;
+    data[key] = values.join("=");
+  }
+
+  if (type === "boss-spawn") {
+    return `${time} Boss spawned ${describeBossEvent(data)}`;
+  }
+  if (type === "boss-phase") {
+    return `${time} Boss phase ${data.phase ?? "?"}`;
+  }
+  if (type === "boss-defeat") {
+    return `${time} Boss defeated${data.durationMs ? ` in ${Math.round(Number(data.durationMs) / 1000)}s` : ""}`;
+  }
+  if (type === "upgrade-picked") {
+    return `${time} Upgrade taken ${data.upgrade ?? ""}`.trim();
+  }
+  if (type === "pickup") {
+    return `${time} Pickup collected`;
+  }
+  if (type === "damage") {
+    return `${time} Player hit`;
+  }
+  if (type === "dash") {
+    return `${time} Dash used`;
+  }
+  return `${time} ${type.replace(/-/g, " ")}`;
+}
+
+function describeBossEvent(data: Record<string, string>): string {
+  const bossId = data.bossId ? Number(data.bossId) : 0;
+  const names: Record<number, string> = { 1: "Vector Regent", 2: "Lane Warden", 3: "Apex Engine" };
+  const name = names[bossId] || `Boss ${bossId || "?"}`;
+  const apex = data.finalApex === "true" ? "final apex" : "";
+  return [name, apex].filter(Boolean).join(" ");
 }
 
 async function syncNow() {
