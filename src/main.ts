@@ -182,6 +182,7 @@ const replayButton = mustGetButton("replay-button");
 const copySeedButton = mustGetButton("copy-seed-button");
 const copyLinkButton = mustGetButton("copy-link-button");
 const copyReportButton = mustGetButton("copy-report-button");
+const copyChronologyButton = mustGetButton("copy-chronology-button");
 const restartButton = mustGetButton("restart-button");
 const menuButton = mustGetButton("menu-button");
 const playerNameInput = mustGetInput("player-name");
@@ -313,6 +314,16 @@ copyReportButton.addEventListener("click", async () => {
     showToast("Run report copied.", "success");
   } catch {
     showToast("Run report copy failed.", "error");
+  }
+});
+copyChronologyButton.addEventListener("click", async () => {
+  if (!lastRun) return;
+  const chronology = buildRunChronology(lastRun);
+  try {
+    await navigator.clipboard.writeText(chronology);
+    showToast("Run chronology copied.", "success");
+  } catch {
+    showToast("Run chronology copy failed.", "error");
   }
 });
 recentRunsList.addEventListener("click", (event) => {
@@ -1981,6 +1992,12 @@ function buildRunReport(run: RunSummary): string {
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
   ];
   return lines.join("\n");
+}
+
+function buildRunChronology(run: RunSummary): string {
+  const chronology = run.chronology || [];
+  if (chronology.length === 0) return "No chronology recorded.";
+  return chronology.join("\n");
 }
 
 function getBuildBreakdown(run: RunSummary): Record<string, string> {
