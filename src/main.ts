@@ -6,7 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
-import { getPendingRuns, getSavedName, isRunPinned, readPinnedRunIds, readRuns, removeRun, sortRunsWithPinned, toggleRunPinned } from "./services/localRuns";
+import { getPendingRuns, getSavedName, isRunPinned, readPinnedRunIds, readRuns, removeRun, sortRunsWithPinned, toggleRunPinned, updateRunNote } from "./services/localRuns";
 import { formatKeybindSummary, readKeybinds, resetKeybinds, updateKeybind, type KeybindAction, type KeybindState } from "./services/keybinds";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
@@ -72,6 +72,9 @@ const recentRunsList = mustGet("recent-runs-list");
 const selectedRunSync = mustGet("selected-run-sync");
 const selectedRunSummary = mustGet("selected-run-summary");
 const selectedRunComparison = mustGet("selected-run-comparison");
+const selectedRunNote = mustGetInput("selected-run-note");
+const selectedRunNoteSave = mustGetButton("selected-run-note-save");
+const selectedRunNoteClear = mustGetButton("selected-run-note-clear");
 const selectedRunPin = mustGetButton("selected-run-pin");
 const selectedRunReplay = mustGetButton("selected-run-replay");
 const selectedRunCopySeed = mustGetButton("selected-run-copy-seed");
@@ -161,6 +164,9 @@ const leaderboardExport = mustGetButton("leaderboard-export");
 const selectedBoardSync = mustGet("selected-board-sync");
 const selectedBoardSummary = mustGet("selected-board-summary");
 const selectedBoardComparison = mustGet("selected-board-comparison");
+const selectedBoardNote = mustGetInput("selected-board-note");
+const selectedBoardNoteSave = mustGetButton("selected-board-note-save");
+const selectedBoardNoteClear = mustGetButton("selected-board-note-clear");
 const selectedBoardPin = mustGetButton("selected-board-pin");
 const selectedBoardReplay = mustGetButton("selected-board-replay");
 const selectedBoardCopySeed = mustGetButton("selected-board-copy-seed");
@@ -383,6 +389,15 @@ selectedRunDelete.addEventListener("click", () => {
   renderSelectedRunPanel();
   showToast("Selected run deleted.", "success");
 });
+selectedRunNoteSave.addEventListener("click", () => {
+  if (!selectedRecentRun) return;
+  saveRunNote(selectedRecentRun.id, selectedRunNote.value);
+});
+selectedRunNoteClear.addEventListener("click", () => {
+  if (!selectedRecentRun) return;
+  selectedRunNote.value = "";
+  saveRunNote(selectedRecentRun.id, "");
+});
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
 leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(leaderboardMode));
@@ -455,6 +470,15 @@ selectedBoardDelete.addEventListener("click", () => {
   renderSelectedBoardPanel();
   renderRecentRunsPanel();
   showToast("Leaderboard run deleted.", "success");
+});
+selectedBoardNoteSave.addEventListener("click", () => {
+  if (!selectedBoardRun) return;
+  saveRunNote(selectedBoardRun.id, selectedBoardNote.value);
+});
+selectedBoardNoteClear.addEventListener("click", () => {
+  if (!selectedBoardRun) return;
+  selectedBoardNote.value = "";
+  saveRunNote(selectedBoardRun.id, "");
 });
 submitButton.addEventListener("click", submitCurrentRun);
 debugToggle.addEventListener("click", () => debugPanel.classList.toggle("hidden"));
@@ -936,10 +960,10 @@ function renderLeaderboardModeButtons() {
 
 function renderLeaderboard(result: LeaderboardResult) {
   leaderboardSource.textContent = result.source === "remote" ? "Online" : "Local";
-  currentLeaderboardRows = [...result.rows];
+  currentLeaderboardRows = hydrateRowsWithLocalMetadata(result.rows);
   leaderboardList.innerHTML = "";
 
-  const rows = filterRuns(result.rows).slice(0, 10);
+  const rows = filterRuns(currentLeaderboardRows).slice(0, 10);
   if (rows.length === 0) {
     const empty = document.createElement("li");
     empty.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
@@ -965,7 +989,7 @@ async function exportLeaderboardCsv() {
   }
 
   const csv = [
-    ["player", "mode", "survivalMs", "score", "kills", "threat", "seed", "synced", "createdAt"],
+    ["player", "mode", "survivalMs", "score", "kills", "threat", "seed", "note", "synced", "createdAt"],
     ...rows.map((run) => [
       run.playerName,
       run.mode,
@@ -974,6 +998,7 @@ async function exportLeaderboardCsv() {
       String(run.kills),
       String(run.maxThreatLevel),
       run.seed,
+      run.note || "",
       run.synced ? "yes" : "no",
       run.createdAt,
     ]),
@@ -1067,6 +1092,10 @@ function renderSelectedRunPanel() {
   selectedRunSync.textContent = run?.synced ? "Synced" : run ? "Local" : "None";
   selectedRunPin.textContent = run ? (isRunPinned(run.id) ? "Unpin" : "Pin") : "Pin";
   selectedRunPin.disabled = !run;
+  selectedRunNote.value = run?.note || "";
+  selectedRunNote.disabled = !run;
+  selectedRunNoteSave.disabled = !run;
+  selectedRunNoteClear.disabled = !run || !run.note;
   selectedRunSummary.innerHTML = "";
   selectedRunComparison.innerHTML = "";
 
@@ -1092,6 +1121,13 @@ function renderSelectedRunPanel() {
     const item = document.createElement("div");
     item.className = "debug-stat";
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    selectedRunSummary.append(item);
+  }
+
+  if (run?.note) {
+    const item = document.createElement("div");
+    item.className = "debug-stat col-span-2";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">note</span><strong class="block whitespace-pre-wrap text-white">${escapeHtml(run.note)}</strong>`;
     selectedRunSummary.append(item);
   }
 
@@ -1131,6 +1167,7 @@ function renderRecentRunsPanel() {
     item.innerHTML = `
       <strong class="block truncate text-white">${isRunPinned(run.id) ? "★ " : ""}${escapeHtml(run.playerName)}</strong>
       <span class="mt-1 block text-xs leading-5 text-slate-400">${run.mode.toUpperCase()} · ${(run.survivalMs / 1000).toFixed(1)}s · ${run.score.toLocaleString()} pts</span>
+      ${run.note ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-pulse">Note</span>` : ""}
     `;
     recentRunsList.append(item);
   });
@@ -1146,6 +1183,10 @@ function renderSelectedBoardPanel() {
   selectedBoardSync.textContent = run?.synced ? "Synced" : run ? "Local" : "None";
   selectedBoardPin.textContent = run ? (isRunPinned(run.id) ? "Unpin" : "Pin") : "Pin";
   selectedBoardPin.disabled = !run;
+  selectedBoardNote.value = run?.note || "";
+  selectedBoardNote.disabled = !run;
+  selectedBoardNoteSave.disabled = !run;
+  selectedBoardNoteClear.disabled = !run || !run.note;
   selectedBoardSummary.innerHTML = "";
   selectedBoardComparison.innerHTML = "";
 
@@ -1174,7 +1215,26 @@ function renderSelectedBoardPanel() {
     selectedBoardSummary.append(item);
   }
 
+  if (run?.note) {
+    const item = document.createElement("div");
+    item.className = "debug-stat col-span-2";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">note</span><strong class="block whitespace-pre-wrap text-white">${escapeHtml(run.note)}</strong>`;
+    selectedBoardSummary.append(item);
+  }
+
   renderRunComparisonGrid(selectedBoardComparison, run);
+}
+
+function hydrateRowsWithLocalMetadata(rows: RunRecord[]): RunRecord[] {
+  const localRuns = new Map(readRuns().map((run) => [run.id, run]));
+  return rows.map((row) => {
+    const local = localRuns.get(row.id);
+    if (!local) return row;
+    return {
+      ...row,
+      note: local.note ?? row.note,
+    };
+  });
 }
 
 function renderRunComparisonGrid(container: HTMLElement, run: RunRecord | null) {
@@ -2070,9 +2130,26 @@ function buildRunRecordReport(run: RunRecord): string {
     `threat: ${run.maxThreatLevel}`,
     `synced: ${run.synced ? "yes" : "no"}`,
     `pinned: ${isRunPinned(run.id) ? "yes" : "no"}`,
+    `note: ${run.note?.trim() || "none"}`,
     `id: ${run.id}`,
   ];
   return lines.join("\n");
+}
+
+function saveRunNote(runId: string, note: string): void {
+  const saved = updateRunNote(runId, note);
+  if (!saved) {
+    showToast("Run note could not be saved.", "error");
+    return;
+  }
+
+  const refreshedRun = readRuns().find((entry) => entry.id === runId) || null;
+  if (selectedRecentRun?.id === runId) selectedRecentRun = refreshedRun;
+  if (selectedBoardRun?.id === runId) selectedBoardRun = refreshedRun;
+  renderRecentRunsPanel();
+  renderSelectedRunPanel();
+  void refreshLeaderboard(leaderboardMode);
+  showToast(note.trim() ? "Run note saved." : "Run note cleared.", "success");
 }
 
 function describeRunStyle(run: RunSummary): { title: string; note: string } {
@@ -2171,6 +2248,7 @@ function createLeaderboardRow(run: RunRecord, index: number) {
     <span class="min-w-0">
       <strong class="block truncate text-white">${escapeHtml(run.playerName)}</strong>
       <span class="text-xs text-slate-400">${time}s · ${run.kills} kills</span>
+      ${run.note ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-pulse">Note</span>` : ""}
     </span>
     <strong class="text-gold">${run.score.toLocaleString()}</strong>
   `;

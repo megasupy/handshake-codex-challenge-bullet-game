@@ -11,6 +11,7 @@ export type RunRecord = {
   mode: GameMode;
   createdAt: string;
   synced: boolean;
+  note?: string;
 };
 
 export type LeaderboardResult = {

@@ -23,6 +23,20 @@ export function saveLocalRun(run: RunRecord): void {
   writeRuns(sortRuns(runs));
 }
 
+export function updateRunNote(id: string, note: string): boolean {
+  const cleanNote = normalizeNote(note);
+  let updated = false;
+  const runs = readRuns().map((run) => {
+    if (run.id !== id) return run;
+    updated = true;
+    return cleanNote ? { ...run, note: cleanNote } : removeRunNote(run);
+  });
+
+  if (!updated) return false;
+  writeRuns(sortRuns(runs));
+  return true;
+}
+
 export function removeRun(id: string): void {
   writeRuns(readRuns().filter((run) => run.id !== id));
   writePinnedRunIds(readPinnedRunIds().filter((runId) => runId !== id));
@@ -94,4 +108,13 @@ function compareRuns(a: RunRecord, b: RunRecord): number {
   if (b.survivalMs !== a.survivalMs) return b.survivalMs - a.survivalMs;
   if (b.score !== a.score) return b.score - a.score;
   return b.kills - a.kills;
+}
+
+function normalizeNote(note: string): string {
+  return note.trim().slice(0, 500);
+}
+
+function removeRunNote(run: RunRecord): RunRecord {
+  const { note: _note, ...rest } = run;
+  return rest;
 }

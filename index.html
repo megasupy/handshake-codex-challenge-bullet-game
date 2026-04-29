@@ -122,8 +122,14 @@
                 <strong class="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Run vs Best</strong>
                 <div id="selected-board-comparison" class="mt-3 grid grid-cols-2 gap-2 text-xs"></div>
               </div>
+              <label class="mt-4 block text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
+                Run Note
+                <textarea id="selected-board-note" class="mt-2 min-h-24 w-full resize-y rounded-md border border-line bg-slate-950/80 px-3 py-2 text-sm leading-6 text-white outline-none ring-pulse focus:ring-2" maxlength="500" placeholder="Add a note about the build, pathing, or mistakes."></textarea>
+              </label>
               <div class="mt-4 flex flex-wrap gap-2">
                 <button id="selected-board-pin" class="btn-secondary px-3 py-2">Pin</button>
+                <button id="selected-board-note-save" class="btn-secondary px-3 py-2">Save Note</button>
+                <button id="selected-board-note-clear" class="btn-secondary px-3 py-2">Clear Note</button>
                 <button id="selected-board-replay" class="btn-secondary px-3 py-2">Replay</button>
                 <button id="selected-board-copy-seed" class="btn-secondary px-3 py-2">Copy Seed</button>
                 <button id="selected-board-copy-link" class="btn-secondary px-3 py-2">Copy Link</button>
@@ -149,8 +155,14 @@
                 <strong class="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Run vs Best</strong>
                 <div id="selected-run-comparison" class="mt-3 grid grid-cols-2 gap-2 text-xs"></div>
               </div>
+              <label class="mt-4 block text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
+                Run Note
+                <textarea id="selected-run-note" class="mt-2 min-h-24 w-full resize-y rounded-md border border-line bg-slate-950/80 px-3 py-2 text-sm leading-6 text-white outline-none ring-pulse focus:ring-2" maxlength="500" placeholder="Add a note about the build, pathing, or mistakes."></textarea>
+              </label>
               <div class="mt-4 flex flex-wrap gap-2">
                 <button id="selected-run-pin" class="btn-secondary px-3 py-2">Pin</button>
+                <button id="selected-run-note-save" class="btn-secondary px-3 py-2">Save Note</button>
+                <button id="selected-run-note-clear" class="btn-secondary px-3 py-2">Clear Note</button>
                 <button id="selected-run-replay" class="btn-secondary px-3 py-2">Replay</button>
                 <button id="selected-run-copy-seed" class="btn-secondary px-3 py-2">Copy Seed</button>
                 <button id="selected-run-copy-link" class="btn-secondary px-3 py-2">Copy Link</button>
