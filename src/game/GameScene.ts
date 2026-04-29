@@ -242,7 +242,7 @@ export class GameScene extends Phaser.Scene {
     this.dashIndicator.setDepth(2);
     this.physics.add.existing(this.player);
     this.playerBody = this.player.body as Phaser.Physics.Arcade.Body;
-    this.playerBody.setSize(9, 9).setOffset(7.5, 7.5).setCollideWorldBounds(true);
+    this.playerBody.setSize(7, 7).setOffset(8.5, 8.5).setCollideWorldBounds(true);
   }
 
   private createInput() {

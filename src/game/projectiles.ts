@@ -59,9 +59,7 @@ export function fireEnemyBullet(
 }
 
 function getEnemyBulletTexture(angle: number): string {
-  const roll = Math.abs(Math.sin(angle * 2.7));
-  if (roll > 0.72) return "enemy-bullet-arrow";
-  if (roll > 0.36) return "enemy-bullet-diamond";
+  void angle;
   return "enemy-bullet-circle";
 }
 
