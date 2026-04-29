@@ -37,6 +37,20 @@ export function updateRunNote(id: string, note: string): boolean {
   return true;
 }
 
+export function updateRunTags(id: string, tags: string[]): boolean {
+  const cleanTags = normalizeTags(tags);
+  let updated = false;
+  const runs = readRuns().map((run) => {
+    if (run.id !== id) return run;
+    updated = true;
+    return cleanTags.length > 0 ? { ...run, tags: cleanTags } : removeRunTags(run);
+  });
+
+  if (!updated) return false;
+  writeRuns(sortRuns(runs));
+  return true;
+}
+
 export function removeRun(id: string): void {
   writeRuns(readRuns().filter((run) => run.id !== id));
   writePinnedRunIds(readPinnedRunIds().filter((runId) => runId !== id));
@@ -116,5 +130,22 @@ function normalizeNote(note: string): string {
 
 function removeRunNote(run: RunRecord): RunRecord {
   const { note: _note, ...rest } = run;
+  return rest;
+}
+
+function normalizeTags(tags: string[]): string[] {
+  return Array.from(
+    new Set(
+      tags
+        .flatMap((tag) => String(tag).split(","))
+        .map((tag) => tag.trim().replace(/\s+/g, " "))
+        .filter(Boolean)
+        .slice(0, 12),
+    ),
+  ).slice(0, 12);
+}
+
+function removeRunTags(run: RunRecord): RunRecord {
+  const { tags: _tags, ...rest } = run;
   return rest;
 }

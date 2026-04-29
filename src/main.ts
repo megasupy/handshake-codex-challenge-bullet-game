@@ -6,7 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
-import { getPendingRuns, getSavedName, isRunPinned, readPinnedRunIds, readRuns, removeRun, sortRunsWithPinned, toggleRunPinned, updateRunNote } from "./services/localRuns";
+import { getPendingRuns, getSavedName, isRunPinned, readPinnedRunIds, readRuns, removeRun, sortRunsWithPinned, toggleRunPinned, updateRunNote, updateRunTags } from "./services/localRuns";
 import { formatKeybindSummary, readKeybinds, resetKeybinds, updateKeybind, type KeybindAction, type KeybindState } from "./services/keybinds";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
@@ -75,6 +75,9 @@ const selectedRunComparison = mustGet("selected-run-comparison");
 const selectedRunNote = mustGetInput("selected-run-note");
 const selectedRunNoteSave = mustGetButton("selected-run-note-save");
 const selectedRunNoteClear = mustGetButton("selected-run-note-clear");
+const selectedRunTags = mustGetInput("selected-run-tags");
+const selectedRunTagsSave = mustGetButton("selected-run-tags-save");
+const selectedRunTagsClear = mustGetButton("selected-run-tags-clear");
 const selectedRunPin = mustGetButton("selected-run-pin");
 const selectedRunReplay = mustGetButton("selected-run-replay");
 const selectedRunCopySeed = mustGetButton("selected-run-copy-seed");
@@ -167,6 +170,9 @@ const selectedBoardComparison = mustGet("selected-board-comparison");
 const selectedBoardNote = mustGetInput("selected-board-note");
 const selectedBoardNoteSave = mustGetButton("selected-board-note-save");
 const selectedBoardNoteClear = mustGetButton("selected-board-note-clear");
+const selectedBoardTags = mustGetInput("selected-board-tags");
+const selectedBoardTagsSave = mustGetButton("selected-board-tags-save");
+const selectedBoardTagsClear = mustGetButton("selected-board-tags-clear");
 const selectedBoardPin = mustGetButton("selected-board-pin");
 const selectedBoardReplay = mustGetButton("selected-board-replay");
 const selectedBoardCopySeed = mustGetButton("selected-board-copy-seed");
@@ -398,6 +404,15 @@ selectedRunNoteClear.addEventListener("click", () => {
   selectedRunNote.value = "";
   saveRunNote(selectedRecentRun.id, "");
 });
+selectedRunTagsSave.addEventListener("click", () => {
+  if (!selectedRecentRun) return;
+  saveRunTags(selectedRecentRun.id, selectedRunTags.value);
+});
+selectedRunTagsClear.addEventListener("click", () => {
+  if (!selectedRecentRun) return;
+  selectedRunTags.value = "";
+  saveRunTags(selectedRecentRun.id, "");
+});
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
 leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(leaderboardMode));
@@ -479,6 +494,15 @@ selectedBoardNoteClear.addEventListener("click", () => {
   if (!selectedBoardRun) return;
   selectedBoardNote.value = "";
   saveRunNote(selectedBoardRun.id, "");
+});
+selectedBoardTagsSave.addEventListener("click", () => {
+  if (!selectedBoardRun) return;
+  saveRunTags(selectedBoardRun.id, selectedBoardTags.value);
+});
+selectedBoardTagsClear.addEventListener("click", () => {
+  if (!selectedBoardRun) return;
+  selectedBoardTags.value = "";
+  saveRunTags(selectedBoardRun.id, "");
 });
 submitButton.addEventListener("click", submitCurrentRun);
 debugToggle.addEventListener("click", () => debugPanel.classList.toggle("hidden"));
@@ -989,7 +1013,7 @@ async function exportLeaderboardCsv() {
   }
 
   const csv = [
-    ["player", "mode", "survivalMs", "score", "kills", "threat", "seed", "note", "synced", "createdAt"],
+    ["player", "mode", "survivalMs", "score", "kills", "threat", "seed", "note", "tags", "synced", "createdAt"],
     ...rows.map((run) => [
       run.playerName,
       run.mode,
@@ -999,6 +1023,7 @@ async function exportLeaderboardCsv() {
       String(run.maxThreatLevel),
       run.seed,
       run.note || "",
+      (run.tags || []).join("; "),
       run.synced ? "yes" : "no",
       run.createdAt,
     ]),
@@ -1096,6 +1121,10 @@ function renderSelectedRunPanel() {
   selectedRunNote.disabled = !run;
   selectedRunNoteSave.disabled = !run;
   selectedRunNoteClear.disabled = !run || !run.note;
+  selectedRunTags.value = (run?.tags || []).join(", ");
+  selectedRunTags.disabled = !run;
+  selectedRunTagsSave.disabled = !run;
+  selectedRunTagsClear.disabled = !run || !(run?.tags?.length);
   selectedRunSummary.innerHTML = "";
   selectedRunComparison.innerHTML = "";
 
@@ -1128,6 +1157,13 @@ function renderSelectedRunPanel() {
     const item = document.createElement("div");
     item.className = "debug-stat col-span-2";
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">note</span><strong class="block whitespace-pre-wrap text-white">${escapeHtml(run.note)}</strong>`;
+    selectedRunSummary.append(item);
+  }
+
+  if (run?.tags?.length) {
+    const item = document.createElement("div");
+    item.className = "debug-stat col-span-2";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">tags</span><strong class="block whitespace-pre-wrap text-white">${escapeHtml(run.tags.join(", "))}</strong>`;
     selectedRunSummary.append(item);
   }
 
@@ -1168,6 +1204,7 @@ function renderRecentRunsPanel() {
       <strong class="block truncate text-white">${isRunPinned(run.id) ? "★ " : ""}${escapeHtml(run.playerName)}</strong>
       <span class="mt-1 block text-xs leading-5 text-slate-400">${run.mode.toUpperCase()} · ${(run.survivalMs / 1000).toFixed(1)}s · ${run.score.toLocaleString()} pts</span>
       ${run.note ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-pulse">Note</span>` : ""}
+      ${run.tags?.length ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Tags</span>` : ""}
     `;
     recentRunsList.append(item);
   });
@@ -1187,6 +1224,10 @@ function renderSelectedBoardPanel() {
   selectedBoardNote.disabled = !run;
   selectedBoardNoteSave.disabled = !run;
   selectedBoardNoteClear.disabled = !run || !run.note;
+  selectedBoardTags.value = (run?.tags || []).join(", ");
+  selectedBoardTags.disabled = !run;
+  selectedBoardTagsSave.disabled = !run;
+  selectedBoardTagsClear.disabled = !run || !(run?.tags?.length);
   selectedBoardSummary.innerHTML = "";
   selectedBoardComparison.innerHTML = "";
 
@@ -1222,6 +1263,13 @@ function renderSelectedBoardPanel() {
     selectedBoardSummary.append(item);
   }
 
+  if (run?.tags?.length) {
+    const item = document.createElement("div");
+    item.className = "debug-stat col-span-2";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">tags</span><strong class="block whitespace-pre-wrap text-white">${escapeHtml(run.tags.join(", "))}</strong>`;
+    selectedBoardSummary.append(item);
+  }
+
   renderRunComparisonGrid(selectedBoardComparison, run);
 }
 
@@ -1233,6 +1281,7 @@ function hydrateRowsWithLocalMetadata(rows: RunRecord[]): RunRecord[] {
     return {
       ...row,
       note: local.note ?? row.note,
+      tags: local.tags ?? row.tags,
     };
   });
 }
@@ -1329,6 +1378,8 @@ function matchesRunSearch(run: RunRecord): boolean {
     run.playerName,
     run.mode,
     run.seed,
+    run.note || "",
+    ...(run.tags || []),
     run.score.toString(),
     run.kills.toString(),
     run.maxThreatLevel.toString(),
@@ -2131,6 +2182,7 @@ function buildRunRecordReport(run: RunRecord): string {
     `synced: ${run.synced ? "yes" : "no"}`,
     `pinned: ${isRunPinned(run.id) ? "yes" : "no"}`,
     `note: ${run.note?.trim() || "none"}`,
+    `tags: ${(run.tags || []).join(", ") || "none"}`,
     `id: ${run.id}`,
   ];
   return lines.join("\n");
@@ -2150,6 +2202,26 @@ function saveRunNote(runId: string, note: string): void {
   renderSelectedRunPanel();
   void refreshLeaderboard(leaderboardMode);
   showToast(note.trim() ? "Run note saved." : "Run note cleared.", "success");
+}
+
+function saveRunTags(runId: string, tagsText: string): void {
+  const tags = tagsText
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  const saved = updateRunTags(runId, tags);
+  if (!saved) {
+    showToast("Run tags could not be saved.", "error");
+    return;
+  }
+
+  const refreshedRun = readRuns().find((entry) => entry.id === runId) || null;
+  if (selectedRecentRun?.id === runId) selectedRecentRun = refreshedRun;
+  if (selectedBoardRun?.id === runId) selectedBoardRun = refreshedRun;
+  renderRecentRunsPanel();
+  renderSelectedRunPanel();
+  void refreshLeaderboard(leaderboardMode);
+  showToast(tags.length > 0 ? "Run tags saved." : "Run tags cleared.", "success");
 }
 
 function describeRunStyle(run: RunSummary): { title: string; note: string } {
@@ -2249,6 +2321,7 @@ function createLeaderboardRow(run: RunRecord, index: number) {
       <strong class="block truncate text-white">${escapeHtml(run.playerName)}</strong>
       <span class="text-xs text-slate-400">${time}s · ${run.kills} kills</span>
       ${run.note ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-pulse">Note</span>` : ""}
+      ${run.tags?.length ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Tags</span>` : ""}
     </span>
     <strong class="text-gold">${run.score.toLocaleString()}</strong>
   `;

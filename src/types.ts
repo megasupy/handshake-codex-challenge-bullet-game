@@ -12,6 +12,7 @@ export type RunRecord = {
   createdAt: string;
   synced: boolean;
   note?: string;
+  tags?: string[];
 };
 
 export type LeaderboardResult = {
