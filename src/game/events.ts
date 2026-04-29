@@ -46,6 +46,8 @@ export type DebugStats = {
   nextUpgradeMs: number;
   dashCooldownMs: number;
   seed: string;
+  danger: number;
+  projectedDanger: number;
 };
 
 export type BossHudPayload = {

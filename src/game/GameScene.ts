@@ -720,6 +720,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private getDebugStats() {
+    const autoplayer = this.autoplayer.getTelemetrySnapshot();
     return {
       elapsedMs: this.elapsedMs,
       threat: this.getThreatLevel(),
@@ -734,6 +735,8 @@ export class GameScene extends Phaser.Scene {
       nextUpgradeMs: Math.max(0, this.nextUpgradeAt - this.elapsedMs),
       dashCooldownMs: Math.max(0, this.dashAt - this.elapsedMs),
       seed: this.seed,
+      danger: round(autoplayer.danger),
+      projectedDanger: round(autoplayer.projectedDanger),
     };
   }
 

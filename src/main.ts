@@ -132,6 +132,8 @@ const pauseScore = mustGet("pause-score");
 const pauseThreat = mustGet("pause-threat");
 const pauseHp = mustGet("pause-hp");
 const pauseBoss = mustGet("pause-boss");
+const pauseDangerLabel = mustGet("pause-danger-label");
+const pauseDangerTrace = mustGet("pause-danger-trace");
 const pauseButton = mustGetButton("pause-button");
 const pauseResume = mustGetButton("pause-resume");
 const pauseRestart = mustGetButton("pause-restart");
@@ -217,6 +219,7 @@ let telemetryFilterValue = readStoredText(TELEMETRY_FILTER_KEY);
 let selectedTelemetryRunId: string | null = null;
 let runSearchValue = readStoredText(RUN_SEARCH_KEY);
 let runSortValue = readStoredText(RUN_SORT_KEY) || "best";
+let dangerHistory: number[] = [];
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 let toastId = 0;
@@ -676,7 +679,9 @@ gameEvents.addEventListener("boss-hud", (event) => {
 gameEvents.addEventListener("debug-stats", (event) => {
   const detail = (event as CustomEvent<DebugStats>).detail;
   debugControls.time.value = Math.floor(detail.elapsedMs / 1000).toString();
+  dangerHistory = [...dangerHistory.slice(-7), detail.danger];
   renderDebugStats(detail);
+  if (runPaused) renderPauseSnapshot();
 });
 
 gameEvents.addEventListener("automation-complete", (event) => {
@@ -722,6 +727,7 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
   if (!checkpoint) clearCheckpoint();
   currentMode = mode;
   lastRun = null;
+  dangerHistory = [];
   hide(menu);
   hide(gameOver);
   hide(upgradeScreen);
@@ -1437,6 +1443,21 @@ function renderPauseSnapshot() {
     pauseBoss.textContent = `${currentBossHudState.name} · Phase ${currentBossHudState.phase} · ${Math.max(0, Math.min(100, Math.round((currentBossHudState.hp / currentBossHudState.maxHp) * 100)))}%`;
   } else {
     pauseBoss.textContent = "none";
+  }
+  pauseDangerLabel.textContent = dangerHistory.length > 0 ? dangerHistory[dangerHistory.length - 1].toFixed(1) : "0.0";
+  pauseDangerTrace.innerHTML = "";
+  const max = Math.max(1, ...dangerHistory, 1);
+  for (const value of dangerHistory.slice(-8)) {
+    const bar = document.createElement("span");
+    bar.className = "block rounded-sm bg-pulse/80";
+    bar.style.height = `${Math.max(8, Math.round((value / max) * 100))}%`;
+    pauseDangerTrace.append(bar);
+  }
+  while (pauseDangerTrace.childElementCount < 8) {
+    const bar = document.createElement("span");
+    bar.className = "block rounded-sm bg-slate-800/70";
+    bar.style.height = "8%";
+    pauseDangerTrace.append(bar);
   }
 }
 
