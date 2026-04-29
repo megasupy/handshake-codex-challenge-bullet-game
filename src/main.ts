@@ -23,6 +23,7 @@ const AUTOPLAYER_KEY = "storm_debug_autoplayer_v1";
 const LEADERBOARD_MODE_KEY = "storm_leaderboard_mode_v1";
 const RUN_SEARCH_KEY = "storm_run_search_v1";
 const RUN_TAG_FILTER_KEY = "storm_run_tag_filter_v1";
+const RUN_COMPARE_KEY = "storm_run_compare_v1";
 const TELEMETRY_FILTER_KEY = "storm_telemetry_filter_v1";
 const RUN_SORT_KEY = "storm_run_sort_v1";
 const query = new URLSearchParams(window.location.search);
@@ -73,6 +74,7 @@ const recentRunsList = mustGet("recent-runs-list");
 const selectedRunSync = mustGet("selected-run-sync");
 const selectedRunSummary = mustGet("selected-run-summary");
 const selectedRunComparison = mustGet("selected-run-comparison");
+const selectedRunCompare = mustGet("selected-run-compare") as HTMLSelectElement;
 const selectedRunNote = mustGetInput("selected-run-note");
 const selectedRunNoteSave = mustGetButton("selected-run-note-save");
 const selectedRunNoteClear = mustGetButton("selected-run-note-clear");
@@ -168,6 +170,7 @@ const leaderboardExport = mustGetButton("leaderboard-export");
 const selectedBoardSync = mustGet("selected-board-sync");
 const selectedBoardSummary = mustGet("selected-board-summary");
 const selectedBoardComparison = mustGet("selected-board-comparison");
+const selectedBoardCompare = mustGet("selected-board-compare") as HTMLSelectElement;
 const selectedBoardNote = mustGetInput("selected-board-note");
 const selectedBoardNoteSave = mustGetButton("selected-board-note-save");
 const selectedBoardNoteClear = mustGetButton("selected-board-note-clear");
@@ -250,6 +253,7 @@ let telemetryFilterValue = readStoredText(TELEMETRY_FILTER_KEY);
 let selectedTelemetryRunId: string | null = null;
 let runSearchValue = readStoredText(RUN_SEARCH_KEY);
 let runTagFilterValue = readStoredText(RUN_TAG_FILTER_KEY);
+let runCompareValue = readStoredText(RUN_COMPARE_KEY);
 let runSortValue = readStoredText(RUN_SORT_KEY) || "best";
 let dangerHistory: number[] = [];
 let pendingKeybindAction: KeybindAction | null = null;
@@ -269,6 +273,8 @@ telemetryFilter.value = telemetryFilterValue;
 runSearch.value = runSearchValue;
 runTagFilterClear.disabled = !runTagFilterValue;
 runSort.value = runSortValue;
+selectedRunCompare.value = runCompareValue;
+selectedBoardCompare.value = runCompareValue;
 refreshDailySeedUi();
 renderRunTagFilterUi();
 
@@ -583,6 +589,12 @@ tagStatsList.addEventListener("click", (event) => {
   if (!chip) return;
   const tag = chip.dataset.tagFilter || "";
   setRunTagFilter(tag);
+});
+selectedRunCompare.addEventListener("change", () => {
+  setRunCompareTarget(selectedRunCompare.value);
+});
+selectedBoardCompare.addEventListener("change", () => {
+  setRunCompareTarget(selectedBoardCompare.value);
 });
 runSort.addEventListener("change", () => {
   runSortValue = runSort.value;
@@ -1195,7 +1207,7 @@ function renderSelectedRunPanel() {
     selectedRunSummary.append(item);
   }
 
-  renderRunComparisonGrid(selectedRunComparison, run);
+  renderRunComparisonGrid(selectedRunComparison, run, getRunCompareTarget());
 }
 
 function renderRecentRunsPanel() {
@@ -1240,6 +1252,7 @@ function renderRecentRunsPanel() {
   if (!selectedRecentRun || !runs.some((run) => run.id === selectedRecentRun?.id)) {
     selectedRecentRun = runs[0] || null;
   }
+  renderRunCompareUi(runs);
   renderRunTagFilterUi(runs);
   renderTagStatsPanel(allRuns);
   renderSelectedRunPanel();
@@ -1300,7 +1313,8 @@ function renderSelectedBoardPanel() {
     selectedBoardSummary.append(item);
   }
 
-  renderRunComparisonGrid(selectedBoardComparison, run);
+  renderRunCompareUi(sortRunsForView(readRuns()));
+  renderRunComparisonGrid(selectedBoardComparison, run, getRunCompareTarget());
 }
 
 function renderRunTagFilterUi(runs: RunRecord[] = sortRunsForView(readRuns())) {
@@ -1382,6 +1396,45 @@ function renderTagStatsPanel(runs: RunRecord[] = readRuns()) {
   }
 }
 
+function renderRunCompareUi(runs: RunRecord[] = sortRunsForView(readRuns())) {
+  const options = [
+    { value: "best", label: "Best" },
+    ...runs.slice(0, 12).map((run) => ({
+      value: run.id,
+      label: `${run.playerName} · ${(run.survivalMs / 1000).toFixed(1)}s · ${run.score.toLocaleString()}`,
+    })),
+  ];
+  if (!options.some((option) => option.value === runCompareValue)) {
+    runCompareValue = "best";
+    writeStoredText(RUN_COMPARE_KEY, runCompareValue);
+  }
+
+  for (const select of [selectedRunCompare, selectedBoardCompare]) {
+    select.innerHTML = "";
+    for (const option of options) {
+      const el = document.createElement("option");
+      el.value = option.value;
+      el.textContent = option.label;
+      select.append(el);
+    }
+    select.value = runCompareValue;
+  }
+}
+
+function setRunCompareTarget(value: string): void {
+  runCompareValue = value || "best";
+  writeStoredText(RUN_COMPARE_KEY, runCompareValue);
+  selectedRunCompare.value = runCompareValue;
+  selectedBoardCompare.value = runCompareValue;
+  renderSelectedRunPanel();
+  renderSelectedBoardPanel();
+}
+
+function getRunCompareTarget(): RunRecord | null {
+  if (!runCompareValue || runCompareValue === "best") return null;
+  return readRuns().find((run) => run.id === runCompareValue) || null;
+}
+
 function setRunTagFilter(tag: string): void {
   runTagFilterValue = tag.trim().toLowerCase();
   writeStoredText(RUN_TAG_FILTER_KEY, runTagFilterValue);
@@ -1403,14 +1456,15 @@ function hydrateRowsWithLocalMetadata(rows: RunRecord[]): RunRecord[] {
   });
 }
 
-function renderRunComparisonGrid(container: HTMLElement, run: RunRecord | null) {
+function renderRunComparisonGrid(container: HTMLElement, run: RunRecord | null, compareTarget: RunRecord | null = null) {
   container.innerHTML = "";
+  const target = compareTarget || null;
   const rows: Array<[string, string]> = run
     ? [
-        ["vs survival", formatDelta(run.survivalMs, currentRecords.bestSurvivalMs)],
-        ["vs score", formatDelta(run.score, currentRecords.bestScore)],
-        ["vs kills", formatDelta(run.kills, currentRecords.bestKills)],
-        ["vs threat", formatDelta(run.maxThreatLevel, currentRecords.bestThreat)],
+        ["vs survival", formatDelta(run.survivalMs, target?.survivalMs ?? currentRecords.bestSurvivalMs)],
+        ["vs score", formatDelta(run.score, target?.score ?? currentRecords.bestScore)],
+        ["vs kills", formatDelta(run.kills, target?.kills ?? currentRecords.bestKills)],
+        ["vs threat", formatDelta(run.maxThreatLevel, target?.maxThreatLevel ?? currentRecords.bestThreat)],
       ]
     : [
         ["vs survival", "-"],
@@ -2046,6 +2100,7 @@ function resetAllLocalData() {
     "storm_pinned_runs_v1",
     "storm_run_search_v1",
     "storm_run_tag_filter_v1",
+    "storm_run_compare_v1",
     "storm_run_sort_v1",
     "storm_telemetry_filter_v1",
     "storm_telemetry_archive_v1",
@@ -2071,6 +2126,7 @@ function resetAllLocalData() {
   telemetryFilterValue = "";
   runSearchValue = "";
   runTagFilterValue = "";
+  runCompareValue = "best";
   runSortValue = "best";
   playerNameInput.value = getSavedName();
   telemetryFilter.value = "";
@@ -2078,6 +2134,8 @@ function resetAllLocalData() {
   runTagFilterClear.disabled = true;
   runTagFilterSummary.textContent = "No tag filter active.";
   runTagFilterChips.innerHTML = "";
+  selectedRunCompare.value = "best";
+  selectedBoardCompare.value = "best";
   runSort.value = "best";
   applyPreferencesToUi(currentPreferences);
   renderSettingsPresetPanel();
@@ -2117,12 +2175,15 @@ function syncProfileFromStorage() {
   telemetryFilterValue = readStoredText(TELEMETRY_FILTER_KEY);
   runSearchValue = readStoredText(RUN_SEARCH_KEY);
   runTagFilterValue = readStoredText(RUN_TAG_FILTER_KEY);
+  runCompareValue = readStoredText(RUN_COMPARE_KEY);
   runSortValue = readStoredText(RUN_SORT_KEY) || "best";
   selectedTelemetryRunId = null;
   playerNameInput.value = getSavedName();
   telemetryFilter.value = telemetryFilterValue;
   runSearch.value = runSearchValue;
   runTagFilterClear.disabled = !runTagFilterValue;
+  selectedRunCompare.value = runCompareValue || "best";
+  selectedBoardCompare.value = runCompareValue || "best";
   runSort.value = runSortValue;
   applyPreferencesToUi(currentPreferences);
   renderSettingsPresetPanel();
@@ -2136,6 +2197,7 @@ function syncProfileFromStorage() {
   refreshTutorialUi();
   renderKeybindsPanel();
   renderRunTagFilterUi();
+  renderRunCompareUi();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
   renderBackupSavedAt(new Date().toISOString());
 }

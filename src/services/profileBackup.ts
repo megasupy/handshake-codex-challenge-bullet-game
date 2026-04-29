@@ -14,6 +14,7 @@ import { readKeybinds, resetKeybinds, type KeybindState, writeKeybinds } from ".
 const BACKUP_VERSION = 1;
 const RUN_SEARCH_KEY = "storm_run_search_v1";
 const RUN_TAG_FILTER_KEY = "storm_run_tag_filter_v1";
+const RUN_COMPARE_KEY = "storm_run_compare_v1";
 const RUN_SORT_KEY = "storm_run_sort_v1";
 const TELEMETRY_FILTER_KEY = "storm_telemetry_filter_v1";
 
@@ -34,6 +35,7 @@ export type ProfileBackup = {
   uiState?: {
     runSearch?: string;
     runTagFilter?: string;
+    runCompare?: string;
     runSort?: string;
     telemetryFilter?: string;
   };
@@ -58,6 +60,7 @@ export function exportProfileBackup(): ProfileBackup {
     uiState: {
       runSearch: localStorage.getItem(RUN_SEARCH_KEY) || "",
       runTagFilter: localStorage.getItem(RUN_TAG_FILTER_KEY) || "",
+      runCompare: localStorage.getItem(RUN_COMPARE_KEY) || "",
       runSort: localStorage.getItem(RUN_SORT_KEY) || "best",
       telemetryFilter: localStorage.getItem(TELEMETRY_FILTER_KEY) || "",
     },
@@ -87,6 +90,7 @@ export function importProfileBackup(raw: string): { ok: boolean; error?: string 
     if (parsed.uiState) {
       if (parsed.uiState.runSearch !== undefined) setTextState(RUN_SEARCH_KEY, parsed.uiState.runSearch);
       if (parsed.uiState.runTagFilter !== undefined) setTextState(RUN_TAG_FILTER_KEY, parsed.uiState.runTagFilter);
+      if (parsed.uiState.runCompare !== undefined) setTextState(RUN_COMPARE_KEY, parsed.uiState.runCompare);
       if (parsed.uiState.runSort !== undefined) setTextState(RUN_SORT_KEY, parsed.uiState.runSort);
       if (parsed.uiState.telemetryFilter !== undefined) setTextState(TELEMETRY_FILTER_KEY, parsed.uiState.telemetryFilter);
     }
