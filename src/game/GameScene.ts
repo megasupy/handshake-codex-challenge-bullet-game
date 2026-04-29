@@ -25,6 +25,7 @@ export class GameScene extends Phaser.Scene {
   private playerBody!: Phaser.Physics.Arcade.Body;
   private inputKeys!: Record<string, Phaser.Input.Keyboard.Key>;
   private dashQueued = false;
+  private gamepadDashPressed = false;
   private enemies!: Phaser.Physics.Arcade.Group;
   private playerShots!: Phaser.Physics.Arcade.Group;
   private enemyBullets!: Phaser.Physics.Arcade.Group;
@@ -228,6 +229,7 @@ export class GameScene extends Phaser.Scene {
     this.dashVector.set(1, 0);
     this.lastManualDirection.set(1, 0);
     this.dashQueued = false;
+    this.gamepadDashPressed = false;
     this.pausedForUpgrade = false;
     this.manuallyPaused = false;
     this.nextUpgradeAt = UPGRADE_INTERVAL_MS;
@@ -369,7 +371,10 @@ export class GameScene extends Phaser.Scene {
   private getManualDirection() {
     const x = Number(this.isKeyDown("moveRight")) - Number(this.isKeyDown("moveLeft"));
     const y = Number(this.isKeyDown("moveDown")) - Number(this.isKeyDown("moveUp"));
-    const direction = new Phaser.Math.Vector2(x, y).normalize();
+    const keyboardDirection = new Phaser.Math.Vector2(x, y);
+    const gamepadDirection = keyboardDirection.lengthSq() > 0 ? Phaser.Math.Vector2.ZERO.clone() : this.getGamepadDirection();
+    const direction = (keyboardDirection.lengthSq() > 0 ? keyboardDirection : gamepadDirection).normalize();
+    this.pollGamepadDash(direction);
     if (direction.lengthSq() > 0) this.lastManualDirection.copy(direction);
     return direction;
   }
@@ -423,6 +428,42 @@ export class GameScene extends Phaser.Scene {
 
   private isKeyDown(action: keyof KeybindState): boolean {
     return Boolean(this.inputKeys[action]?.isDown);
+  }
+
+  private getGamepadDirection(): Phaser.Math.Vector2 {
+    const pad = this.getConnectedGamepad();
+    if (!pad) return Phaser.Math.Vector2.ZERO.clone();
+
+    const axisX = pad.axes[0] || 0;
+    const axisY = pad.axes[1] || 0;
+    const dpadX = Number(Boolean(pad.buttons[14]?.pressed)) * -1 + Number(Boolean(pad.buttons[15]?.pressed));
+    const dpadY = Number(Boolean(pad.buttons[12]?.pressed)) * -1 + Number(Boolean(pad.buttons[13]?.pressed));
+    const x = Math.abs(axisX) > 0.28 ? axisX : dpadX;
+    const y = Math.abs(axisY) > 0.28 ? axisY : dpadY;
+    const vector = new Phaser.Math.Vector2(x, y);
+    return vector.lengthSq() > 0 ? vector.normalize() : Phaser.Math.Vector2.ZERO.clone();
+  }
+
+  private pollGamepadDash(direction: Phaser.Math.Vector2) {
+    const pad = this.getConnectedGamepad();
+    if (!pad) {
+      this.gamepadDashPressed = false;
+      return;
+    }
+
+    const dashPressed = Boolean(pad.buttons[0]?.pressed || pad.buttons[5]?.pressed);
+    if (dashPressed && !this.gamepadDashPressed && this.elapsedMs >= this.dashAt && direction.lengthSq() > 0) {
+      this.dashQueued = true;
+    }
+    this.gamepadDashPressed = dashPressed;
+  }
+
+  private getConnectedGamepad(): Gamepad | null {
+    const pads = navigator.getGamepads?.() || [];
+    for (const pad of pads) {
+      if (pad && pad.connected) return pad;
+    }
+    return null;
   }
 
   private autoShoot() {
