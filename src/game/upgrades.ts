@@ -32,6 +32,10 @@ export function chooseAutoplayerUpgrade(options: UpgradeOption[], stats: PlayerS
   return scored[0]?.id || options[0]?.id || "speed";
 }
 
+export function getUpgradeTitle(id: string): string {
+  return UPGRADE_OPTIONS.find((option) => option.id === id)?.title || id;
+}
+
 export function applyUpgrade(stats: PlayerStats, health: number, id: string): { stats: PlayerStats; health: number } {
   const next = { ...stats };
   let nextHealth = health;

@@ -144,6 +144,7 @@ const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
 const runStyle = mustGet("run-style");
 const runDamage = mustGet("run-damage");
+const runUpgradePath = mustGet("run-upgrade-path");
 const runComparison = mustGet("run-comparison");
 const runSeed = mustGet("run-seed");
 const leaderboardList = mustGet("leaderboard-list");
@@ -651,6 +652,7 @@ gameEvents.addEventListener("game-over", (event) => {
   renderRunSummary(lastRun);
   renderRunStyle(lastRun);
   renderRunDamage(lastRun);
+  renderRunUpgradePath(lastRun);
   renderRunComparison(lastRun, previousRecords);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
@@ -1455,6 +1457,25 @@ function renderRunDamage(run: RunSummary) {
   }
 }
 
+function renderRunUpgradePath(run: RunSummary) {
+  runUpgradePath.innerHTML = "";
+  const path = run.upgradePath || [];
+  if (path.length === 0) {
+    const item = document.createElement("li");
+    item.className = "rounded-full border border-line bg-slate-950/70 px-3 py-2 text-slate-400";
+    item.textContent = "No upgrades taken";
+    runUpgradePath.append(item);
+    return;
+  }
+
+  for (const upgrade of path) {
+    const item = document.createElement("li");
+    item.className = "rounded-full border border-pulse/40 bg-slate-900/80 px-3 py-2 text-slate-100";
+    item.textContent = upgrade;
+    runUpgradePath.append(item);
+  }
+}
+
 function renderRunComparison(run: RunSummary, previous: RecordsState) {
   runComparison.innerHTML = "";
   const rows: Array<[string, string | number]> = [
@@ -1884,6 +1905,7 @@ function buildRunReport(run: RunSummary): string {
     `damageBurst: ${run.damageBurst ?? 0}`,
     `damageCornered: ${run.damageCornered ?? 0}`,
     `damageBossContact: ${run.damageBossContact ?? 0}`,
+    `upgradePath: ${(run.upgradePath || []).join(" > ") || "none"}`,
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
   ];
   return lines.join("\n");

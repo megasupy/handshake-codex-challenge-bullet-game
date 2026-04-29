@@ -38,4 +38,5 @@ export type RunSummary = Omit<RunRecord, "id" | "playerName" | "createdAt" | "sy
   damageBurst?: number;
   damageCornered?: number;
   damageBossContact?: number;
+  upgradePath?: string[];
 };

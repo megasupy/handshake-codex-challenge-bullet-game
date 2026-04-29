@@ -14,7 +14,7 @@ import { magnetPickups, restorePickup } from "./pickups";
 import { firePlayerShot, restoreEnemyBullet, restorePlayerShot, updateProjectiles } from "./projectiles";
 import { getVisualPalette } from "./palette";
 import { TelemetryRecorder, toAutoplayerSample, type TelemetryConfig } from "./telemetry";
-import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpgradeOptions } from "./upgrades";
+import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpgradeOptions, getUpgradeTitle } from "./upgrades";
 import { applyProgression, type ProgressionState } from "../services/progression";
 import { clearCheckpoint, writeCheckpoint, type CheckpointState } from "../services/checkpoint";
 import { readPreferences } from "../services/preferences";
@@ -69,6 +69,7 @@ export class GameScene extends Phaser.Scene {
   private playerShotsHit = 0;
   private upgradesTaken = 0;
   private bossesDefeated = 0;
+  private upgradePath: string[] = [];
   private damageTaken = 0;
   private damageAttrition = 0;
   private damageBurst = 0;
@@ -249,6 +250,7 @@ export class GameScene extends Phaser.Scene {
     this.playerShotsHit = 0;
     this.upgradesTaken = 0;
     this.bossesDefeated = 0;
+    this.upgradePath = [];
     this.damageTaken = 0;
     this.damageAttrition = 0;
     this.damageBurst = 0;
@@ -766,6 +768,7 @@ export class GameScene extends Phaser.Scene {
       maxHealth: this.health,
       speed: this.stats.speed,
       finalThreat: this.getThreatLevel(),
+      upgradePath: [...this.upgradePath],
       damageTaken: this.damageTaken,
       damageAttrition: this.damageAttrition,
       damageBurst: this.damageBurst,
@@ -895,6 +898,7 @@ export class GameScene extends Phaser.Scene {
     this.stats = result.stats;
     this.health = result.health;
     this.upgradesTaken += 1;
+    this.upgradePath.push(getUpgradeTitle(id));
     this.nextUpgradeAt += UPGRADE_INTERVAL_MS;
     this.telemetry?.logEvent(this.elapsedMs, "upgrade-picked", {
       id,
