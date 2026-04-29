@@ -18,6 +18,7 @@ import { formatAchievementsSummary, listAchievements, readAchievements, updateAc
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
 import type { GameMode, LeaderboardResult, RunRecord, RunSummary } from "./types";
 import type { TelemetryConfig, TelemetryRun } from "./game/telemetry";
+import { normalizeMenuTab, renderMenuTabs as renderTabsUi, type MenuTab } from "./ui/menuTabs";
 
 const AUTOPLAYER_KEY = "storm_debug_autoplayer_v1";
 const LEADERBOARD_MODE_KEY = "storm_leaderboard_mode_v1";
@@ -26,6 +27,7 @@ const RUN_TAG_FILTER_KEY = "storm_run_tag_filter_v1";
 const RUN_COMPARE_KEY = "storm_run_compare_v1";
 const TELEMETRY_FILTER_KEY = "storm_telemetry_filter_v1";
 const RUN_SORT_KEY = "storm_run_sort_v1";
+const MENU_TAB_KEY = "storm_menu_tab_v1";
 const query = new URLSearchParams(window.location.search);
 const automationConfig = getAutomationConfig();
 
@@ -217,6 +219,8 @@ const debugClose = mustGetButton("debug-close");
 const debugPanel = mustGet("debug-panel");
 const debugStats = mustGet("debug-stats");
 const toastStack = mustGet("toast-stack");
+const menuTabButtons = Array.from(document.querySelectorAll("[data-menu-tab-button]")) as HTMLButtonElement[];
+const menuTabPanels = Array.from(menu.querySelectorAll("[data-menu-tab]")) as HTMLElement[];
 
 const debugControls = {
   enabled: mustGetInput("debug-enabled"),
@@ -262,6 +266,7 @@ let dangerHistory: number[] = [];
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 let toastId = 0;
+let currentMenuTab: MenuTab = normalizeMenuTab(readStoredText(MENU_TAB_KEY) || "home");
 
 if (automationConfig.autoplayer) localStorage.setItem(AUTOPLAYER_KEY, "true");
 playerNameInput.value = getSavedName();
@@ -280,6 +285,7 @@ selectedRunCompare.value = runCompareValue;
 selectedBoardCompare.value = runCompareValue;
 refreshDailySeedUi();
 renderRunTagFilterUi();
+renderMenuTabs();
 
 playButton.addEventListener("click", () => startRun("endless"));
 campaignButton.addEventListener("click", () => startRun("campaign"));
@@ -291,6 +297,9 @@ resumeButton.addEventListener("click", () => {
 dailyButton.addEventListener("click", () => startRun("daily"));
 bossRushButton.addEventListener("click", () => startRun("boss-rush", null, undefined, 58000));
 tutorialButton.addEventListener("click", () => showTutorial());
+for (const button of menuTabButtons) {
+  button.addEventListener("click", () => setMenuTab(button.dataset.menuTabButton || "home"));
+}
 dailySeedCopy.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(dailySeedPreview.textContent || dailySeed());
@@ -317,7 +326,7 @@ pauseRestart.addEventListener("click", () => startRun(currentMode));
 pauseMenu.addEventListener("click", () => void showMenu());
 replayButton.addEventListener("click", () => {
   if (!lastRun) return;
-  startRun(lastRun.mode, null, lastRun.seed);
+  startReplay(lastRun);
 });
 copySeedButton.addEventListener("click", async () => {
   if (!lastRun) return;
@@ -370,7 +379,7 @@ recentRunsList.addEventListener("click", (event) => {
 });
 selectedRunReplay.addEventListener("click", () => {
   if (!selectedRecentRun) return;
-  startRun(selectedRecentRun.mode, null, selectedRecentRun.seed);
+  startReplay(selectedRecentRun);
 });
 selectedRunPin.addEventListener("click", () => {
   if (!selectedRecentRun) return;
@@ -466,7 +475,7 @@ leaderboardList.addEventListener("click", (event) => {
 });
 selectedBoardReplay.addEventListener("click", () => {
   if (!selectedBoardRun) return;
-  startRun(selectedBoardRun.mode, null, selectedBoardRun.seed);
+  startReplay(selectedBoardRun);
 });
 selectedBoardPin.addEventListener("click", () => {
   if (!selectedBoardRun) return;
@@ -909,12 +918,23 @@ async function showMenu() {
   hideHud();
   hideBossHud();
   runPaused = false;
+  setMenuTab("home");
   show(menu);
   renderProgressionPanel();
   game.scene.stop("game");
   refreshCheckpointUi();
   refreshTutorialUi();
   await refreshLeaderboard(leaderboardMode);
+}
+
+function setMenuTab(tab: string) {
+  currentMenuTab = normalizeMenuTab(tab);
+  writeStoredText(MENU_TAB_KEY, currentMenuTab);
+  renderMenuTabs();
+}
+
+function renderMenuTabs() {
+  renderTabsUi(menuTabPanels, menuTabButtons, currentMenuTab);
 }
 
 function chooseUpgrade(id: string) {
@@ -1065,7 +1085,7 @@ async function exportLeaderboardCsv() {
   }
 
   const csv = [
-    ["player", "mode", "survivalMs", "score", "kills", "threat", "seed", "note", "tags", "synced", "createdAt"],
+    ["player", "mode", "survivalMs", "score", "kills", "threat", "level", "seed", "note", "tags", "synced", "createdAt"],
     ...rows.map((run) => [
       run.playerName,
       run.mode,
@@ -1073,6 +1093,7 @@ async function exportLeaderboardCsv() {
       String(run.score),
       String(run.kills),
       String(run.maxThreatLevel),
+      String(run.campaignLevel ?? 1),
       run.seed,
       run.note || "",
       (run.tags || []).join("; "),
@@ -1182,7 +1203,7 @@ function renderSelectedRunPanel() {
 
   const rows: Record<string, string | number> = run
     ? {
-        mode: run.mode.toUpperCase(),
+        mode: formatModeLabel(run.mode),
         time: `${(run.survivalMs / 1000).toFixed(1)}s`,
         score: run.score.toLocaleString(),
         kills: run.kills,
@@ -1255,7 +1276,7 @@ function renderRecentRunsPanel() {
     item.dataset.runId = run.id;
     item.innerHTML = `
       <strong class="block truncate text-white">${isRunPinned(run.id) ? "★ " : ""}${escapeHtml(run.playerName)}</strong>
-      <span class="mt-1 block text-xs leading-5 text-slate-400">${run.mode.toUpperCase()} · ${(run.survivalMs / 1000).toFixed(1)}s · ${run.score.toLocaleString()} pts</span>
+      <span class="mt-1 block text-xs leading-5 text-slate-400">${formatModeLabel(run.mode)} · ${(run.survivalMs / 1000).toFixed(1)}s · ${run.score.toLocaleString()} pts</span>
       ${run.note ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-pulse">Note</span>` : ""}
       ${run.tags?.length ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Tags</span>` : ""}
     `;
@@ -1290,7 +1311,7 @@ function renderSelectedBoardPanel() {
   const rows: Record<string, string | number> = run
     ? {
         player: run.playerName,
-        mode: run.mode.toUpperCase(),
+        mode: formatModeLabel(run.mode),
         time: `${(run.survivalMs / 1000).toFixed(1)}s`,
         score: run.score.toLocaleString(),
         kills: run.kills,
@@ -1466,6 +1487,7 @@ function hydrateRowsWithLocalMetadata(rows: RunRecord[]): RunRecord[] {
       ...row,
       note: local.note ?? row.note,
       tags: local.tags ?? row.tags,
+      campaignLevel: local.campaignLevel ?? row.campaignLevel,
     };
   });
 }
@@ -2276,11 +2298,24 @@ function buildReplayLink(run: Pick<RunSummary, "mode" | "seed">) {
   url.searchParams.set("mode", run.mode);
   url.searchParams.set("seed", run.seed);
   url.searchParams.set("maxMs", "300000");
+  if (run.mode === "boss-rush") url.searchParams.set("startMs", "58000");
   return url.toString();
 }
 
 function buildRunLink(run: Pick<RunRecord, "mode" | "seed">) {
   return buildReplayLink(run);
+}
+
+function startReplay(run: Pick<RunSummary, "mode" | "seed">) {
+  startRun(run.mode, null, run.seed, run.mode === "boss-rush" ? 58000 : undefined);
+}
+
+function formatModeLabel(mode: GameMode): string {
+  if (mode === "boss-rush") return "Boss Rush";
+  return mode
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function buildRunReport(run: RunSummary): string {
@@ -2297,7 +2332,6 @@ function buildRunReport(run: RunSummary): string {
     `accuracy: ${((run.shotAccuracy ?? 0) * 100).toFixed(0)}%`,
     `upgrades: ${run.upgradesTaken ?? 0}`,
     `bosses: ${run.bossesDefeated ?? 0}`,
-    `campaignLevel: ${run.campaignLevel ?? 1}`,
     `buildStyle: ${style.title}`,
     `buildNote: ${style.note}`,
     `damageTaken: ${run.damageTaken ?? 0}`,
@@ -2529,6 +2563,7 @@ function createLeaderboardRow(run: RunRecord, index: number) {
     <span class="min-w-0">
       <strong class="block truncate text-white">${escapeHtml(run.playerName)}</strong>
       <span class="text-xs text-slate-400">${time}s · ${run.kills} kills</span>
+      <span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200">${formatModeLabel(run.mode)}${run.mode === "campaign" ? ` · L${run.campaignLevel ?? 1}` : ""}</span>
       ${run.note ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-pulse">Note</span>` : ""}
       ${run.tags?.length ? `<span class="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">Tags</span>` : ""}
     </span>
@@ -2597,7 +2632,8 @@ function mustGetInput(id: string): HTMLInputElement {
 
 function getAutomationConfig() {
   const active = query.get("autorun") === "1";
-  const mode = query.get("mode") === "daily" || query.get("mode") === "campaign" ? query.get("mode") : "endless";
+  const modeParam = query.get("mode");
+  const mode = modeParam === "daily" || modeParam === "campaign" || modeParam === "boss-rush" ? modeParam : "endless";
   const seed = query.get("seed");
   const startMs = Math.max(0, Number(query.get("startMs") || 0));
   const autoplayer = query.get("autoplayer") === "1" || active;

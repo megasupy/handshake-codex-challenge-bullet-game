@@ -1,4 +1,4 @@
-import type { RunRecord } from "../types";
+import type { GameMode, RunRecord } from "../types";
 import type { CheckpointState } from "./checkpoint";
 import { clearCheckpoint, writeCheckpoint } from "./checkpoint";
 import { readPinnedRunIds, readRuns, saveName, writePinnedRunIds, writeRuns } from "./localRuns";
@@ -17,6 +17,7 @@ const RUN_TAG_FILTER_KEY = "storm_run_tag_filter_v1";
 const RUN_COMPARE_KEY = "storm_run_compare_v1";
 const RUN_SORT_KEY = "storm_run_sort_v1";
 const TELEMETRY_FILTER_KEY = "storm_telemetry_filter_v1";
+const LEADERBOARD_MODE_KEY = "storm_leaderboard_mode_v1";
 
 export type ProfileBackup = {
   version: number;
@@ -38,6 +39,7 @@ export type ProfileBackup = {
     runCompare?: string;
     runSort?: string;
     telemetryFilter?: string;
+    leaderboardMode?: GameMode;
   };
   checkpoint: CheckpointState | null;
 };
@@ -63,6 +65,7 @@ export function exportProfileBackup(): ProfileBackup {
       runCompare: localStorage.getItem(RUN_COMPARE_KEY) || "",
       runSort: localStorage.getItem(RUN_SORT_KEY) || "best",
       telemetryFilter: localStorage.getItem(TELEMETRY_FILTER_KEY) || "",
+      leaderboardMode: normalizeLeaderboardMode(localStorage.getItem(LEADERBOARD_MODE_KEY)),
     },
     checkpoint: readCheckpointSafe(),
   };
@@ -93,6 +96,7 @@ export function importProfileBackup(raw: string): { ok: boolean; error?: string 
       if (parsed.uiState.runCompare !== undefined) setTextState(RUN_COMPARE_KEY, parsed.uiState.runCompare);
       if (parsed.uiState.runSort !== undefined) setTextState(RUN_SORT_KEY, parsed.uiState.runSort);
       if (parsed.uiState.telemetryFilter !== undefined) setTextState(TELEMETRY_FILTER_KEY, parsed.uiState.telemetryFilter);
+      if (parsed.uiState.leaderboardMode !== undefined) setTextState(LEADERBOARD_MODE_KEY, normalizeLeaderboardMode(parsed.uiState.leaderboardMode));
     }
     if (parsed.checkpoint === null) clearCheckpoint();
     else if (parsed.checkpoint) writeCheckpoint(parsed.checkpoint);
@@ -115,4 +119,8 @@ function readCheckpointSafe(): CheckpointState | null {
 function setTextState(key: string, value: string): void {
   if (value) localStorage.setItem(key, value);
   else localStorage.removeItem(key);
+}
+
+function normalizeLeaderboardMode(mode: string | null | undefined): GameMode {
+  return mode === "daily" || mode === "campaign" ? mode : "endless";
 }

@@ -17,7 +17,7 @@
 
 @layer components {
   .overlay {
-    @apply absolute inset-0 z-20 flex items-center justify-center gap-6 p-4 backdrop-blur-sm sm:p-8;
+    @apply absolute inset-0 z-20 flex flex-wrap items-start justify-center gap-4 overflow-y-auto p-3 backdrop-blur-sm sm:gap-6 sm:p-6;
   }
 
   .panel {
@@ -82,5 +82,21 @@
 
   .debug-stat {
     @apply rounded-md border border-line bg-slate-900/70 px-2 py-1;
+  }
+
+  #menu {
+    @apply content-start;
+  }
+
+  #menu .panel {
+    @apply w-full max-w-[min(100%,42rem)] max-h-[calc(100vh-1.5rem)] overflow-y-auto;
+  }
+
+  #menu > .panel:first-child {
+    @apply max-w-[min(100%,52rem)];
+  }
+
+  #menu > aside.panel {
+    @apply max-w-[min(100%,28rem)];
   }
 }

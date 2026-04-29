@@ -553,7 +553,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     flashEnemy(this, enemy);
-    combatText(this, enemy.x, enemy.y - 18, `-${shot.getData("damage") as number}`, getVisualPalette().playerShot);
     playSound("enemy-hit");
 
     if (data.hp <= 0) this.killEnemy(enemy, data);
@@ -569,7 +568,6 @@ export class GameScene extends Phaser.Scene {
       if (!result.hit) return true;
       this.playerShotsHit += 1;
       this.telemetry?.logEvent(this.elapsedMs, "boss-hit", { hpRatio: round(this.boss.hp / this.boss.maxHp) });
-      combatText(this, this.boss.x, this.boss.y - 22, `-${shot.getData("damage") as number}`, getVisualPalette().playerShot);
       playSound(result.phaseChanged ? "upgrade" : "enemy-hit");
       if (result.phaseChanged) {
         this.telemetry?.logEvent(this.elapsedMs, "boss-phase", { phase: this.boss.phase });
