@@ -108,6 +108,7 @@ const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
 const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
+const leaderboardRefresh = mustGetButton("leaderboard-refresh");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
@@ -204,6 +205,7 @@ copyLinkButton.addEventListener("click", async () => {
 });
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
+leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(currentMode));
 submitButton.addEventListener("click", submitCurrentRun);
 debugToggle.addEventListener("click", () => debugPanel.classList.toggle("hidden"));
 debugClose.addEventListener("click", () => hide(debugPanel));
