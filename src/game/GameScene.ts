@@ -6,7 +6,7 @@ import { playSound } from "./audio";
 import { BOSS_RESPAWN_DELAY_MS, Boss1Controller, FIRST_BOSS_AT_MS, SECOND_BOSS_AT_MS, THIRD_BOSS_AT_MS } from "./boss1";
 import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_DEBUG_SETTINGS, DEFAULT_PLAYER_STATS, TELEMETRY_SAMPLE_INTERVAL_MS, UPGRADE_INTERVAL_MS } from "./constants";
 import { applyDebugSettings as mergeDebugSettings } from "./debug";
-import { dashTrail, enemyDeathBurst, flashEnemy, pickupCollectBurst, playerHitBurst, upgradePulse } from "./effects";
+import { combatText, dashTrail, enemyDeathBurst, flashEnemy, pickupCollectBurst, playerHitBurst, upgradePulse } from "./effects";
 import { createPickup, firePattern, getEnemyWaveStep, restoreEnemyFromState, spawnEnemyIfReady, updateEnemies } from "./enemies";
 import { emitAutomationComplete, emitAutomationSnapshot, emitBossHud, emitDebugStats, emitGameOver, emitHud, emitUpgrade, type DebugSettings, type UpgradeOption } from "./events";
 import type { EnemyData } from "./gameTypes";
@@ -533,6 +533,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     flashEnemy(this, enemy);
+    combatText(this, enemy.x, enemy.y - 18, `-${shot.getData("damage") as number}`, getVisualPalette().playerShot);
     playSound("enemy-hit");
 
     if (data.hp <= 0) this.killEnemy(enemy, data);
@@ -548,6 +549,7 @@ export class GameScene extends Phaser.Scene {
       if (!result.hit) return true;
       this.playerShotsHit += 1;
       this.telemetry?.logEvent(this.elapsedMs, "boss-hit", { hpRatio: round(this.boss.hp / this.boss.maxHp) });
+      combatText(this, this.boss.x, this.boss.y - 22, `-${shot.getData("damage") as number}`, getVisualPalette().playerShot);
       playSound(result.phaseChanged ? "upgrade" : "enemy-hit");
       if (result.phaseChanged) {
         this.telemetry?.logEvent(this.elapsedMs, "boss-phase", { phase: this.boss.phase });
@@ -598,6 +600,7 @@ export class GameScene extends Phaser.Scene {
     this.kills += 1;
     this.score += data.kind === "spinner" || data.kind === "bomber" ? 24 : 12;
     enemyDeathBurst(this, enemy.x, enemy.y, (enemy.getData("color") as number | undefined) ?? 0xfb7185);
+    combatText(this, enemy.x, enemy.y - 10, `+${data.kind === "spinner" || data.kind === "bomber" ? 24 : 12}`, getVisualPalette().pickup);
     playSound("enemy-death");
     if (this.rng.frac() > 0.2) createPickup(this, this.pickups, enemy.x, enemy.y, this.rng, 1);
     enemy.destroy();
@@ -617,6 +620,7 @@ export class GameScene extends Phaser.Scene {
     pickupCollectBurst(this, pickup.x, pickup.y);
     pickup.destroy();
     this.score += 8 * value;
+    combatText(this, pickup.x, pickup.y, `+${8 * value}`, getVisualPalette().pickup);
     this.telemetry?.logEvent(this.elapsedMs, "pickup", { value, x: round(pickup.x), y: round(pickup.y) });
     playSound("pickup");
   }

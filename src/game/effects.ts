@@ -132,3 +132,25 @@ export function upgradePulse(scene: Phaser.Scene, player: Phaser.GameObjects.Sha
     onComplete: () => ring.destroy(),
   });
 }
+
+export function combatText(scene: Phaser.Scene, x: number, y: number, text: string, color: number): void {
+  const label = scene.add.text(x, y, text, {
+    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+    fontSize: "16px",
+    fontStyle: "bold",
+    color: `#${color.toString(16).padStart(6, "0")}`,
+    stroke: "#050816",
+    strokeThickness: 4,
+  });
+  label.setOrigin(0.5);
+  label.setDepth(50);
+  scene.tweens.add({
+    targets: label,
+    y: y - 28,
+    alpha: 0,
+    scale: 1.15,
+    duration: readPreferences().reducedMotion ? 420 : 620,
+    ease: "Quad.easeOut",
+    onComplete: () => label.destroy(),
+  });
+}
