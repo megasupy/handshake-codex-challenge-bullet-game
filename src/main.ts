@@ -122,6 +122,7 @@ const pauseResume = mustGetButton("pause-resume");
 const pauseRestart = mustGetButton("pause-restart");
 const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
+const runComparison = mustGet("run-comparison");
 const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
 const leaderboardModeEndless = mustGetButton("leaderboard-mode-endless");
@@ -397,6 +398,7 @@ gameEvents.addEventListener("upgrade", (event) => {
 
 gameEvents.addEventListener("game-over", (event) => {
   lastRun = (event as CustomEvent<RunSummary>).detail;
+  const previousRecords = currentRecords;
   currentProgression = grantRunReward(lastRun);
   currentRecords = updateRecords(lastRun);
   currentAchievements = updateAchievements(lastRun);
@@ -406,6 +408,7 @@ gameEvents.addEventListener("game-over", (event) => {
   text("final-kills", `${lastRun.kills} kills`);
   text("final-threat", `Threat ${lastRun.maxThreatLevel}`);
   renderRunSummary(lastRun);
+  renderRunComparison(lastRun, previousRecords);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
   renderProgressionPanel();
@@ -948,6 +951,30 @@ function renderRunSummary(run: RunSummary) {
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
     runSummary.append(item);
   }
+}
+
+function renderRunComparison(run: RunSummary, previous: RecordsState) {
+  runComparison.innerHTML = "";
+  const rows: Array<[string, string | number]> = [
+    ["vs survival", formatDelta(run.survivalMs, previous.bestSurvivalMs)],
+    ["vs score", formatDelta(run.score, previous.bestScore)],
+    ["vs kills", formatDelta(run.kills, previous.bestKills)],
+    ["vs threat", formatDelta(run.maxThreatLevel, previous.bestThreat)],
+  ];
+
+  for (const [label, value] of rows) {
+    const item = document.createElement("div");
+    item.className = "debug-stat";
+    item.innerHTML = `<span class=\"block uppercase tracking-wider text-slate-500\">${label}</span><strong class=\"block truncate text-white\">${escapeHtml(String(value))}</strong>`;
+    runComparison.append(item);
+  }
+}
+
+function formatDelta(current: number, best: number): string {
+  const delta = current - best;
+  const sign = delta > 0 ? "+" : "";
+  const suffix = Math.abs(best) >= 1000 || Math.abs(current) >= 1000 ? "" : "";
+  return `${current.toLocaleString()} (${sign}${delta.toLocaleString()})${suffix}`;
 }
 
 function renderPauseSnapshot() {
