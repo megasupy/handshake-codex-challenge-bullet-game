@@ -471,6 +471,25 @@ window.addEventListener("keydown", (event) => {
   const option = currentUpgradeOptions[Number(event.key) - 1];
   if (option) chooseUpgrade(option.id);
 });
+window.addEventListener("keydown", (event) => {
+  if (gameOver.classList.contains("hidden")) return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  const key = event.key.toLowerCase();
+  if (key === "r" || key === "c" || key === "l") {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+  }
+  if (key === "r") {
+    event.preventDefault();
+    replayButton.click();
+  } else if (key === "c") {
+    event.preventDefault();
+    copyReportButton.click();
+  } else if (key === "l") {
+    event.preventDefault();
+    copyLinkButton.click();
+  }
+});
 
 Object.values(debugControls).forEach((control) => {
   control.addEventListener("input", applyDebugControls);
