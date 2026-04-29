@@ -260,6 +260,12 @@ window.addEventListener("online", () => void syncPendingRuns());
 window.addEventListener("pointerdown", () => void unlockAudio(), { once: true });
 window.addEventListener("keydown", () => void unlockAudio(), { once: true });
 window.addEventListener("fullscreenchange", () => renderFullscreenUi());
+window.addEventListener("blur", () => {
+  if (shouldAutoPause()) pauseRun();
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && shouldAutoPause()) pauseRun();
+});
 window.addEventListener("keydown", (event) => {
   if (!pendingKeybindAction) return;
   event.preventDefault();
@@ -827,6 +833,14 @@ function renderTelemetryArchive() {
     `;
     telemetryArchiveList.append(item);
   });
+}
+
+function shouldAutoPause(): boolean {
+  if (!getGameScene() || runPaused) return false;
+  if (upgradeScreen.classList.contains("hidden") === false || tutorialScreen.classList.contains("hidden") === false || gameOver.classList.contains("hidden") === false || menu.classList.contains("hidden") === false) {
+    return false;
+  }
+  return true;
 }
 
 function syncProfileFromStorage() {
