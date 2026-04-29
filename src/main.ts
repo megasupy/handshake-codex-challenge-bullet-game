@@ -1648,7 +1648,7 @@ function renderBackupSavedAt(savedAt?: string) {
 }
 
 async function copyLatestTelemetryLog() {
-  const entry = getFilteredTelemetryEntries()[0];
+  const entry = getSelectedTelemetryEntry(getFilteredTelemetryEntries());
   if (!entry) return;
   try {
     await navigator.clipboard.writeText(entry.logText);
@@ -1661,7 +1661,7 @@ async function copyLatestTelemetryLog() {
 }
 
 function downloadLatestTelemetryLog() {
-  const entry = getFilteredTelemetryEntries()[0];
+  const entry = getSelectedTelemetryEntry(getFilteredTelemetryEntries());
   if (!entry) return;
   const blob = new Blob([entry.logText], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
