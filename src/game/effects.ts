@@ -134,6 +134,8 @@ export function upgradePulse(scene: Phaser.Scene, player: Phaser.GameObjects.Sha
 }
 
 export function combatText(scene: Phaser.Scene, x: number, y: number, text: string, color: number): void {
+  const prefs = readPreferences();
+  if (!prefs.combatText) return;
   const label = scene.add.text(x, y, text, {
     fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
     fontSize: "16px",
@@ -149,7 +151,7 @@ export function combatText(scene: Phaser.Scene, x: number, y: number, text: stri
     y: y - 28,
     alpha: 0,
     scale: 1.15,
-    duration: readPreferences().reducedMotion ? 420 : 620,
+    duration: prefs.reducedMotion ? 420 : 620,
     ease: "Quad.easeOut",
     onComplete: () => label.destroy(),
   });

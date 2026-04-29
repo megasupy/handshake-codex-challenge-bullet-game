@@ -7,6 +7,7 @@ export type PreferencesState = {
   screenShakeStrength: number;
   reducedMotion: boolean;
   highContrast: boolean;
+  combatText: boolean;
 };
 
 function defaultPreferences(): PreferencesState {
@@ -17,6 +18,7 @@ function defaultPreferences(): PreferencesState {
     screenShakeStrength: 1,
     reducedMotion: false,
     highContrast: false,
+    combatText: true,
   };
 }
 
@@ -52,6 +54,7 @@ export function formatPreferencesSummary(state: PreferencesState): string {
     state.screenShake ? `Strength ${state.screenShakeStrength.toFixed(1)}x` : "No shake",
     state.reducedMotion ? "Reduced motion" : "Full motion",
     state.highContrast ? "High contrast" : "Standard colors",
+    state.combatText ? "Combat text on" : "Combat text off",
   ];
   return parts.join(" · ");
 }
@@ -65,6 +68,7 @@ function normalizePreferences(input: Partial<PreferencesState>): PreferencesStat
     screenShakeStrength: clampRange(input.screenShakeStrength ?? base.screenShakeStrength, 0.25, 2),
     reducedMotion: input.reducedMotion ?? base.reducedMotion,
     highContrast: input.highContrast ?? base.highContrast,
+    combatText: input.combatText ?? base.combatText,
   };
 }
 

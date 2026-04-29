@@ -78,6 +78,7 @@ const prefsScreenShakeStrength = mustGetInput("prefs-screen-shake-strength");
 const prefsScreenShakeStrengthValue = mustGet("prefs-screen-shake-strength-value");
 const prefsReducedMotion = mustGetInput("prefs-reduced-motion");
 const prefsHighContrast = mustGetInput("prefs-high-contrast");
+const prefsCombatText = mustGetInput("prefs-combat-text");
 const fullscreenSummary = mustGet("fullscreen-summary");
 const fullscreenToggle = mustGetButton("fullscreen-toggle");
 const keybindsSummary = mustGet("keybinds-summary");
@@ -247,6 +248,8 @@ prefsReducedMotion.addEventListener("input", applyPreferenceControls);
 prefsReducedMotion.addEventListener("change", applyPreferenceControls);
 prefsHighContrast.addEventListener("input", applyPreferenceControls);
 prefsHighContrast.addEventListener("change", applyPreferenceControls);
+prefsCombatText.addEventListener("input", applyPreferenceControls);
+prefsCombatText.addEventListener("change", applyPreferenceControls);
 fullscreenToggle.addEventListener("click", () => void toggleFullscreen());
 telemetryArchiveCopy.addEventListener("click", copyLatestTelemetryLog);
 telemetryArchiveDownload.addEventListener("click", downloadLatestTelemetryLog);
@@ -786,6 +789,7 @@ function applyPreferenceControls() {
     screenShakeStrength: Number(prefsScreenShakeStrength.value),
     reducedMotion: prefsReducedMotion.checked,
     highContrast: prefsHighContrast.checked,
+    combatText: prefsCombatText.checked,
   });
   currentSettingsPreset = "custom";
   writeSelectedSettingsPreset("custom");
@@ -801,6 +805,7 @@ function applyPreferencesToUi(state: PreferencesState) {
   prefsScreenShakeStrengthValue.textContent = `${state.screenShakeStrength.toFixed(1)}x`;
   prefsReducedMotion.checked = state.reducedMotion;
   prefsHighContrast.checked = state.highContrast;
+  prefsCombatText.checked = state.combatText;
   preferencesSummary.textContent = formatPreferencesSummary(state);
 }
 
