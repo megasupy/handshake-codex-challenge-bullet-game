@@ -21,8 +21,8 @@ const PHASE_TABLES: Record<1 | 2 | 3, WaveBlock[]> = {
     { durationMs: 24000, mix: { chaser: 0.66, shooter: 0.18, spinner: 0.1, bomber: 0.06 }, spawnScale: 1.18 },
   ],
   2: [
-    { durationMs: 12000, mix: { chaser: 0.45, shooter: 0.28, spinner: 0.14, bomber: 0.13 }, spawnScale: 0.9 },
-    { durationMs: 12000, mix: { chaser: 0.3, strafer: 0.32, shooter: 0.18, spinner: 0.1, bomber: 0.1 }, spawnScale: 0.86 },
+    { durationMs: 12000, mix: { chaser: 0.45, shooter: 0.28, spinner: 0.14, bomber: 0.13 }, spawnScale: 0.98 },
+    { durationMs: 12000, mix: { chaser: 0.3, strafer: 0.32, shooter: 0.18, spinner: 0.1, bomber: 0.1 }, spawnScale: 0.93 },
     { durationMs: 12000, mix: { strafer: 0.28, mine: 0.24, shooter: 0.18, spinner: 0.15, chaser: 0.15 }, spawnScale: 0.84 },
     { durationMs: 24000, mix: { strafer: 0.25, mine: 0.2, bomber: 0.14, shooter: 0.16, spinner: 0.14, chaser: 0.11 }, spawnScale: 0.82 },
   ],
@@ -60,7 +60,7 @@ export function spawnEnemyIfReady(args: {
   if (args.enemies.countActive(true) >= args.debug.enemyCap) return args.elapsedMs + 260;
 
   const block = getWaveBlock(args.phaseId, args.elapsedInPhaseMs);
-  const threatRamp = args.threat > 32 ? 0.64 : args.threat > 24 ? 0.78 : 1;
+  const threatRamp = args.threat > 32 ? 0.74 : args.threat > 24 ? 0.84 : 1;
   const interval = Math.max(165, (1020 / Math.log2(args.threat + 2.4)) * block.spawnScale * threatRamp * args.debug.spawnMultiplier);
   const kind = weightedPick(block.mix, args.rng);
   if (!kind) return args.elapsedMs + interval;
@@ -70,7 +70,7 @@ export function spawnEnemyIfReady(args: {
   if (args.threat > 8 && args.rng.frac() > 0.73 && kind !== "sniper" && kind !== "summoner") {
     createEnemy(args.scene, args.enemies, args.rng, "chaser", args.threat, args.elapsedMs, args.debug, args.player.x, args.player.y);
   }
-  if (args.threat > 24 && args.rng.frac() > 0.68) {
+  if (args.threat > 24 && args.rng.frac() > 0.8) {
     createEnemy(args.scene, args.enemies, args.rng, args.rng.frac() > 0.55 ? "minion" : "strafer", args.threat, args.elapsedMs, args.debug, args.player.x, args.player.y);
   }
   return args.elapsedMs + interval;

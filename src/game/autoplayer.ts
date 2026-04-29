@@ -133,6 +133,13 @@ export class Autoplayer {
     }
 
     this.direction.copy(bestDirection.lengthSq() > 0 ? bestDirection.clone().normalize() : Phaser.Math.Vector2.ZERO);
+    if (edgeDistance < 70 && currentDanger > 5.2) {
+      const centerDirection = new Phaser.Math.Vector2(ARENA_WIDTH / 2 - args.player.x, ARENA_HEIGHT / 2 - args.player.y).normalize();
+      this.direction.copy(centerDirection);
+      this.finishDecision("edge-danger-reset", currentDanger, currentDanger, nearestPickupDistance, nearestEnemyDistance, pickupTarget, startedAt);
+      this.nextDecisionAt = args.elapsedMs + AUTOPLAYER_DECISION_INTERVAL_MS;
+      return this.targetPosition.clone();
+    }
     if (edgeDistance < 130 && currentDanger < 9 && nearestPickupDistance > 170) {
       const centerDirection = new Phaser.Math.Vector2(ARENA_WIDTH / 2 - args.player.x, ARENA_HEIGHT / 2 - args.player.y).normalize();
       this.direction.copy(centerDirection);
@@ -188,8 +195,8 @@ export class Autoplayer {
     const pickupEdge = pickupTarget ? Math.min(pickupTarget.x, ARENA_WIDTH - pickupTarget.x, pickupTarget.y, ARENA_HEIGHT - pickupTarget.y) : Number.POSITIVE_INFINITY;
     const edge = Math.min(x, ARENA_WIDTH - x, y, ARENA_HEIGHT - y);
     let edgePenalty = 0;
-    if (edge < 54) edgePenalty = 140 + (54 - edge) * 4.5;
-    else if (edge < 140) edgePenalty = ((140 - edge) / 140) * 18;
+    if (edge < 54) edgePenalty = 180 + (54 - edge) * 5.8;
+    else if (edge < 140) edgePenalty = ((140 - edge) / 140) * 24;
 
     if (pickupTarget && pickupEdge < 90 && (pickupDistance < 155 || pickupProgress > 0.18)) {
       edgePenalty *= 0.3;

@@ -23,7 +23,6 @@ export class Boss1Controller {
   private readonly bornAt: number;
   private readonly phaseDamageRequired: number[];
   private phaseDamage = 0;
-  private phaseStartedAt: number;
   private attackAt = 0;
   private hitFlashUntil = 0;
   private attackIndex = 0;
@@ -34,11 +33,10 @@ export class Boss1Controller {
     this.bornAt = elapsedMs;
     this.bossId = bossId;
     this.name = bossId === 1 ? "Vector Regent" : bossId === 2 ? "Lane Warden" : "Apex Engine";
-    const hpBase = bossId === 1 ? 620 : bossId === 2 ? 840 : 1120;
-    this.maxHp = hpBase + Math.floor(threat * 34);
+    const hpBase = bossId === 1 ? 640 : bossId === 2 ? 840 : 1120;
+    this.maxHp = hpBase + Math.floor(threat * 33);
     this.hp = this.maxHp;
     this.phaseDamageRequired = [this.maxHp * 0.36, this.maxHp * 0.36, this.maxHp * 0.28];
-    this.phaseStartedAt = elapsedMs;
     this.attackAt = elapsedMs + 850;
     this.view = scene.add.graphics();
     this.redraw(elapsedMs);
@@ -78,11 +76,9 @@ export class Boss1Controller {
     this.phaseDamage += applied;
     this.hitFlashUntil = elapsedMs + 50;
 
-    const minPhaseMs = this.getMinimumPhaseDurationMs();
-    if (this.phase < 3 && this.phaseDamage >= phaseRequirement && elapsedMs - this.phaseStartedAt >= minPhaseMs) {
+    if (this.phase < 3 && this.phaseDamage >= phaseRequirement) {
       this.phase = (this.phase + 1) as Phase;
       this.phaseDamage = 0;
-      this.phaseStartedAt = elapsedMs;
       return { hit: true, defeated: false, phaseChanged: true };
     }
     return { hit: true, defeated: this.hp <= 0, phaseChanged: false };
@@ -213,12 +209,6 @@ export class Boss1Controller {
     if (this.bossId === 1) return this.phase === 1 ? 860 : this.phase === 2 ? 680 : 560;
     if (this.bossId === 2) return this.phase === 1 ? 980 : this.phase === 2 ? 760 : 620;
     return this.phase === 1 ? 760 : this.phase === 2 ? 600 : 520;
-  }
-
-  private getMinimumPhaseDurationMs(): number {
-    if (this.bossId === 1) return 9000;
-    if (this.bossId === 2) return 9500;
-    return 10000;
   }
 
   private redraw(elapsedMs: number) {
