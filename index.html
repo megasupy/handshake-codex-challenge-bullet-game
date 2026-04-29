@@ -49,8 +49,10 @@
               <button id="play-button" class="btn-primary">Play</button>
               <button id="resume-button" class="btn-secondary" disabled>Resume Run</button>
               <button id="daily-button" class="btn-secondary">Daily Seed</button>
+              <button id="tutorial-button" class="btn-secondary">How to Play</button>
             </div>
             <p id="checkpoint-summary" class="mt-3 text-sm leading-6 text-slate-400">No saved run.</p>
+            <p id="tutorial-summary" class="mt-2 text-sm leading-6 text-slate-400">Tutorial on startup.</p>
             <div class="mt-6 flex flex-wrap gap-2 text-sm text-slate-400">
               <span>Move: WASD / arrows</span>
               <span>Dash: Space</span>
@@ -130,6 +132,37 @@
             <p class="eyebrow">Choose one</p>
             <h2 class="text-4xl font-black text-white">Upgrade</h2>
             <div id="upgrade-options" class="mt-6 grid gap-3 sm:grid-cols-3"></div>
+          </div>
+        </section>
+        <section id="tutorial-screen" class="overlay hidden">
+          <div class="panel max-w-2xl">
+            <p class="eyebrow">Quick guide</p>
+            <h2 class="text-4xl font-black text-white">How to Play</h2>
+            <div class="mt-6 grid gap-3 text-sm leading-6 text-slate-300 sm:grid-cols-2">
+              <div class="rounded-md border border-line bg-slate-950/60 p-4">
+                <strong class="block text-white">Move and dash</strong>
+                <p class="mt-2">Use WASD or arrows. Dash with Space. Dash makes you invulnerable for its duration.</p>
+              </div>
+              <div class="rounded-md border border-line bg-slate-950/60 p-4">
+                <strong class="block text-white">Pick upgrades</strong>
+                <p class="mt-2">When the game pauses, choose 1, 2, or 3. Builds matter more than raw survival time.</p>
+              </div>
+              <div class="rounded-md border border-line bg-slate-950/60 p-4">
+                <strong class="block text-white">Watch the arena</strong>
+                <p class="mt-2">Bullets, pickups, and bosses all use distinct shapes and colors. Big shapes mean big danger.</p>
+              </div>
+              <div class="rounded-md border border-line bg-slate-950/60 p-4">
+                <strong class="block text-white">Use the menu tools</strong>
+                <p class="mt-2">Resume checkpoints, replay seeds, archive telemetry, and export a backup from the start screen.</p>
+              </div>
+            </div>
+            <div class="mt-6 flex flex-wrap items-center gap-3">
+              <button id="tutorial-close" class="btn-primary">Got it</button>
+              <label class="debug-check">
+                <input id="tutorial-dont-show" type="checkbox" />
+                <span>Show on startup</span>
+              </label>
+            </div>
           </div>
         </section>
         <section id="game-over" class="overlay hidden">

@@ -8,6 +8,7 @@ import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboa
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
 import { getSavedName } from "./services/localRuns";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
+import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
 import { clearTelemetryArchive, formatTelemetryArchiveEntry, readTelemetryArchive, saveTelemetryRun, type TelemetryArchiveEntry } from "./services/telemetryArchive";
 import { formatPreferencesSummary, readPreferences, updatePreferences, type PreferencesState } from "./services/preferences";
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
@@ -68,6 +69,9 @@ const profileBackupImport = mustGetButton("profile-backup-import");
 const profileBackupCopy = mustGetButton("profile-backup-copy");
 const profileBackupStatus = mustGet("profile-backup-status");
 const upgradeScreen = mustGet("upgrade-screen");
+const tutorialScreen = mustGet("tutorial-screen");
+const tutorialClose = mustGetButton("tutorial-close");
+const tutorialDontShow = mustGetInput("tutorial-dont-show");
 const gameOver = mustGet("game-over");
 const runSummary = mustGet("run-summary");
 const leaderboardList = mustGet("leaderboard-list");
@@ -75,6 +79,8 @@ const leaderboardSource = mustGet("leaderboard-source");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
+const tutorialButton = mustGetButton("tutorial-button");
+const tutorialSummary = mustGet("tutorial-summary");
 const submitButton = mustGetButton("submit-button");
 const replayButton = mustGetButton("replay-button");
 const copyLinkButton = mustGetButton("copy-link-button");
@@ -110,12 +116,14 @@ let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
 let currentPreferences: PreferencesState = readPreferences();
 let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
+let currentTutorial: TutorialState = readTutorialState();
 
 if (automationConfig.autoplayer) localStorage.setItem(AUTOPLAYER_KEY, "true");
 playerNameInput.value = getSavedName();
 debugControls.autoplayer.checked = automationConfig.autoplayer || localStorage.getItem(AUTOPLAYER_KEY) === "true";
 if (automationConfig.timeScale !== null) debugControls.timeScale.value = automationConfig.timeScale.toString();
 applyPreferencesToUi(currentPreferences);
+tutorialDontShow.checked = !currentTutorial.seen;
 
 playButton.addEventListener("click", () => startRun("endless"));
 resumeButton.addEventListener("click", () => {
@@ -124,6 +132,7 @@ resumeButton.addEventListener("click", () => {
   startRun(checkpoint.mode, checkpoint);
 });
 dailyButton.addEventListener("click", () => startRun("daily"));
+tutorialButton.addEventListener("click", () => showTutorial());
 replayButton.addEventListener("click", () => {
   if (!lastRun) return;
   startRun(lastRun.mode, null, lastRun.seed);
@@ -182,6 +191,15 @@ profileBackupCopy.addEventListener("click", async () => {
   } catch {
     profileBackupStatus.textContent = "Copy failed. Use the text box manually.";
   }
+});
+tutorialClose.addEventListener("click", () => {
+  currentTutorial = markTutorialSeen(!tutorialDontShow.checked);
+  refreshTutorialUi();
+  hide(tutorialScreen);
+});
+tutorialDontShow.addEventListener("change", () => {
+  currentTutorial = markTutorialSeen(!tutorialDontShow.checked);
+  refreshTutorialUi();
 });
 mustGetButton("debug-apply-time").addEventListener("click", () => getGameScene()?.setElapsedSeconds(Number(debugControls.time.value) || 0));
 mustGetButton("debug-clear").addEventListener("click", () => getGameScene()?.clearThreats());
@@ -303,10 +321,13 @@ renderProgressionPanel();
 refreshCheckpointUi();
 renderTelemetryArchive();
 profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
+refreshTutorialUi();
 if (automationConfig.active) {
   queueMicrotask(() => startRun(automationConfig.mode));
 } else if (debugControls.autoplayer.checked) {
   queueMicrotask(() => startRun("endless"));
+} else if (!currentTutorial.seen) {
+  queueMicrotask(() => showTutorial());
 }
 
 function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> = null, seedOverride?: string) {
@@ -317,6 +338,7 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
   hide(menu);
   hide(gameOver);
   hide(upgradeScreen);
+  hide(tutorialScreen);
   hide(debugPanel);
   show(debugToggle);
   showHud();
@@ -336,6 +358,7 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
 async function showMenu() {
   hide(gameOver);
   hide(upgradeScreen);
+  hide(tutorialScreen);
   hide(debugToggle);
   hide(debugPanel);
   hideHud();
@@ -344,6 +367,7 @@ async function showMenu() {
   renderProgressionPanel();
   game.scene.stop("game");
   refreshCheckpointUi();
+  refreshTutorialUi();
   await refreshLeaderboard(currentMode);
 }
 
@@ -561,6 +585,12 @@ function renderRunSummary(run: RunSummary) {
   }
 }
 
+function showTutorial() {
+  tutorialDontShow.checked = !currentTutorial.seen;
+  refreshTutorialUi();
+  show(tutorialScreen);
+}
+
 function renderTelemetryArchive() {
   telemetryArchiveCount.textContent = `${currentTelemetryArchive.length} log${currentTelemetryArchive.length === 1 ? "" : "s"}`;
   telemetryArchiveSummary.textContent = currentTelemetryArchive.length > 0
@@ -590,11 +620,18 @@ function renderTelemetryArchive() {
 function syncProfileFromStorage() {
   currentProgression = readProgression();
   currentPreferences = readPreferences();
+  currentTutorial = readTutorialState();
   currentTelemetryArchive = readTelemetryArchive();
   playerNameInput.value = getSavedName();
   applyPreferencesToUi(currentPreferences);
   renderProgressionPanel();
   renderTelemetryArchive();
+  refreshTutorialUi();
+}
+
+function refreshTutorialUi() {
+  tutorialDontShow.checked = !currentTutorial.seen;
+  tutorialSummary.textContent = formatTutorialSummary(currentTutorial);
 }
 
 async function copyLatestTelemetryLog() {
