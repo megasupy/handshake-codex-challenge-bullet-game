@@ -22,6 +22,7 @@ import type { TelemetryConfig, TelemetryRun } from "./game/telemetry";
 const AUTOPLAYER_KEY = "storm_debug_autoplayer_v1";
 const LEADERBOARD_MODE_KEY = "storm_leaderboard_mode_v1";
 const RUN_SEARCH_KEY = "storm_run_search_v1";
+const RUN_TAG_FILTER_KEY = "storm_run_tag_filter_v1";
 const TELEMETRY_FILTER_KEY = "storm_telemetry_filter_v1";
 const RUN_SORT_KEY = "storm_run_sort_v1";
 const query = new URLSearchParams(window.location.search);
@@ -189,6 +190,9 @@ const dailySeedPreview = mustGet("daily-seed-preview");
 const dailySeedCopy = mustGetButton("daily-seed-copy");
 const runSearch = mustGetInput("run-search");
 const runSort = mustGet("run-sort") as HTMLSelectElement;
+const runTagFilterSummary = mustGet("run-tag-filter-summary");
+const runTagFilterChips = mustGet("run-tag-filter-chips");
+const runTagFilterClear = mustGetButton("run-tag-filter-clear");
 const submitButton = mustGetButton("submit-button");
 const replayButton = mustGetButton("replay-button");
 const copySeedButton = mustGetButton("copy-seed-button");
@@ -242,6 +246,7 @@ let selectedBoardRun: RunRecord | null = null;
 let telemetryFilterValue = readStoredText(TELEMETRY_FILTER_KEY);
 let selectedTelemetryRunId: string | null = null;
 let runSearchValue = readStoredText(RUN_SEARCH_KEY);
+let runTagFilterValue = readStoredText(RUN_TAG_FILTER_KEY);
 let runSortValue = readStoredText(RUN_SORT_KEY) || "best";
 let dangerHistory: number[] = [];
 let pendingKeybindAction: KeybindAction | null = null;
@@ -259,8 +264,10 @@ tutorialDontShow.checked = !currentTutorial.seen;
 renderKeybindsPanel();
 telemetryFilter.value = telemetryFilterValue;
 runSearch.value = runSearchValue;
+runTagFilterClear.disabled = !runTagFilterValue;
 runSort.value = runSortValue;
 refreshDailySeedUi();
+renderRunTagFilterUi();
 
 playButton.addEventListener("click", () => startRun("endless"));
 resumeButton.addEventListener("click", () => {
@@ -557,10 +564,21 @@ runSearch.addEventListener("input", () => {
   renderRecentRunsPanel();
   renderLeaderboard({ source: leaderboardSource.textContent === "Online" ? "remote" : "local", rows: currentLeaderboardRows });
 });
+runTagFilterClear.addEventListener("click", () => {
+  setRunTagFilter("");
+});
+runTagFilterChips.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const chip = target.closest("[data-run-tag]") as HTMLElement | null;
+  if (!chip) return;
+  const tag = chip.dataset.runTag || "";
+  setRunTagFilter(tag);
+});
 runSort.addEventListener("change", () => {
   runSortValue = runSort.value;
   writeStoredText(RUN_SORT_KEY, runSortValue);
   renderRecentRunsPanel();
+  renderLeaderboard({ source: leaderboardSource.textContent === "Online" ? "remote" : "local", rows: currentLeaderboardRows });
 });
 profileBackupExport.addEventListener("click", () => {
   const backup = exportProfileBackup();
@@ -1212,6 +1230,7 @@ function renderRecentRunsPanel() {
   if (!selectedRecentRun || !runs.some((run) => run.id === selectedRecentRun?.id)) {
     selectedRecentRun = runs[0] || null;
   }
+  renderRunTagFilterUi(runs);
   renderSelectedRunPanel();
 }
 
@@ -1273,6 +1292,48 @@ function renderSelectedBoardPanel() {
   renderRunComparisonGrid(selectedBoardComparison, run);
 }
 
+function renderRunTagFilterUi(runs: RunRecord[] = sortRunsForView(readRuns())) {
+  runTagFilterValue = runTagFilterValue.trim().toLowerCase();
+  runTagFilterClear.disabled = !runTagFilterValue;
+  runTagFilterSummary.textContent = runTagFilterValue
+    ? `Filtering runs tagged "${runTagFilterValue}".`
+    : "No tag filter active.";
+  runTagFilterChips.innerHTML = "";
+
+  const tags = Array.from(
+    new Set(
+      runs.flatMap((run) => run.tags || []).map((tag) => tag.trim()).filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b)).slice(0, 12);
+
+  if (tags.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "text-xs text-slate-500";
+    empty.textContent = "No tags available yet.";
+    runTagFilterChips.append(empty);
+    return;
+  }
+
+  for (const tag of tags) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.runTag = tag.toLowerCase();
+    button.className = runTagFilterValue === tag.toLowerCase()
+      ? "rounded-full border border-pulse bg-slate-900 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white"
+      : "rounded-full border border-line bg-slate-950/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-300";
+    button.textContent = tag;
+    runTagFilterChips.append(button);
+  }
+}
+
+function setRunTagFilter(tag: string): void {
+  runTagFilterValue = tag.trim().toLowerCase();
+  writeStoredText(RUN_TAG_FILTER_KEY, runTagFilterValue);
+  runTagFilterClear.disabled = !runTagFilterValue;
+  renderRecentRunsPanel();
+  renderLeaderboard({ source: leaderboardSource.textContent === "Online" ? "remote" : "local", rows: currentLeaderboardRows });
+}
+
 function hydrateRowsWithLocalMetadata(rows: RunRecord[]): RunRecord[] {
   const localRuns = new Map(readRuns().map((run) => [run.id, run]));
   return rows.map((row) => {
@@ -1311,8 +1372,7 @@ function renderRunComparisonGrid(container: HTMLElement, run: RunRecord | null) 
 }
 
 function filterRuns(runs: RunRecord[]): RunRecord[] {
-  if (!runSearchValue) return runs;
-  return runs.filter((run) => matchesRunSearch(run));
+  return runs.filter((run) => matchesRunSearch(run) && matchesRunTagFilter(run));
 }
 
 function sortRunsForView(runs: RunRecord[]): RunRecord[] {
@@ -1386,6 +1446,11 @@ function matchesRunSearch(run: RunRecord): boolean {
     `${(run.survivalMs / 1000).toFixed(1)}s`,
   ].join(" ").toLowerCase();
   return haystack.includes(filter);
+}
+
+function matchesRunTagFilter(run: RunRecord): boolean {
+  if (!runTagFilterValue) return true;
+  return (run.tags || []).some((tag) => tag.trim().toLowerCase() === runTagFilterValue);
 }
 
 function renderAchievementsPanel() {
@@ -1924,6 +1989,7 @@ function resetAllLocalData() {
     "storm_runs_v1",
     "storm_pinned_runs_v1",
     "storm_run_search_v1",
+    "storm_run_tag_filter_v1",
     "storm_run_sort_v1",
     "storm_telemetry_filter_v1",
     "storm_telemetry_archive_v1",
@@ -1948,10 +2014,14 @@ function resetAllLocalData() {
   selectedTelemetryRunId = null;
   telemetryFilterValue = "";
   runSearchValue = "";
+  runTagFilterValue = "";
   runSortValue = "best";
   playerNameInput.value = getSavedName();
   telemetryFilter.value = "";
   runSearch.value = "";
+  runTagFilterClear.disabled = true;
+  runTagFilterSummary.textContent = "No tag filter active.";
+  runTagFilterChips.innerHTML = "";
   runSort.value = "best";
   applyPreferencesToUi(currentPreferences);
   renderSettingsPresetPanel();
@@ -1964,6 +2034,7 @@ function resetAllLocalData() {
   renderTelemetryArchive();
   refreshTutorialUi();
   renderKeybindsPanel();
+  renderRunTagFilterUi();
   refreshCheckpointUi();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
   renderBackupSavedAt(new Date().toISOString());
@@ -1989,11 +2060,13 @@ function syncProfileFromStorage() {
   currentTelemetryArchive = readTelemetryArchive();
   telemetryFilterValue = readStoredText(TELEMETRY_FILTER_KEY);
   runSearchValue = readStoredText(RUN_SEARCH_KEY);
+  runTagFilterValue = readStoredText(RUN_TAG_FILTER_KEY);
   runSortValue = readStoredText(RUN_SORT_KEY) || "best";
   selectedTelemetryRunId = null;
   playerNameInput.value = getSavedName();
   telemetryFilter.value = telemetryFilterValue;
   runSearch.value = runSearchValue;
+  runTagFilterClear.disabled = !runTagFilterValue;
   runSort.value = runSortValue;
   applyPreferencesToUi(currentPreferences);
   renderSettingsPresetPanel();
@@ -2006,6 +2079,7 @@ function syncProfileFromStorage() {
   renderTelemetryArchive();
   refreshTutorialUi();
   renderKeybindsPanel();
+  renderRunTagFilterUi();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
   renderBackupSavedAt(new Date().toISOString());
 }
