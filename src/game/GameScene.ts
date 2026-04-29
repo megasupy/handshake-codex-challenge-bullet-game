@@ -192,6 +192,8 @@ export class GameScene extends Phaser.Scene {
     this.dashAt = 0;
     this.dashUntil = 0;
     this.dashVector.set(1, 0);
+    this.lastManualDirection.set(1, 0);
+    this.dashQueued = false;
     this.pausedForUpgrade = false;
     this.nextUpgradeAt = UPGRADE_INTERVAL_MS;
     this.nextBossAt = FIRST_BOSS_AT_MS;
@@ -202,6 +204,7 @@ export class GameScene extends Phaser.Scene {
     this.playerShotsFired = 0;
     this.playerShotsHit = 0;
     this.stats = { ...DEFAULT_PLAYER_STATS };
+    this.autoplayer.reset();
   }
 
   private syncTimeScale() {

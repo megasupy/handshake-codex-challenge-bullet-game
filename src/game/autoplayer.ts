@@ -29,6 +29,26 @@ export class Autoplayer {
     decisionTimeMs: 0,
   };
 
+  reset(): void {
+    this.direction.set(0, 0);
+    this.pickupTarget = null;
+    this.nextDecisionAt = 0;
+    this.bulletSampleOffset = 0;
+    this.lastTelemetry = {
+      directionX: 0,
+      directionY: 0,
+      reason: "idle",
+      danger: 0,
+      projectedDanger: 0,
+      nearestPickupDistance: Number.POSITIVE_INFINITY,
+      nearestEnemyDistance: Number.POSITIVE_INFINITY,
+      pickupTargetX: null,
+      pickupTargetY: null,
+      pickupTargetValue: 0,
+      decisionTimeMs: 0,
+    };
+  }
+
   chooseDirection(args: {
     elapsedMs: number;
     player: Phaser.GameObjects.Shape;
