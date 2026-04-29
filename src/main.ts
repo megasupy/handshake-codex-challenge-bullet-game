@@ -120,6 +120,7 @@ const leaderboardRefresh = mustGetButton("leaderboard-refresh");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
+const bossRushButton = mustGetButton("boss-rush-button");
 const tutorialButton = mustGetButton("tutorial-button");
 const tutorialSummary = mustGet("tutorial-summary");
 const submitButton = mustGetButton("submit-button");
@@ -183,6 +184,7 @@ resumeButton.addEventListener("click", () => {
   startRun(checkpoint.mode, checkpoint);
 });
 dailyButton.addEventListener("click", () => startRun("daily"));
+bossRushButton.addEventListener("click", () => startRun("boss-rush", null, undefined, 58000));
 tutorialButton.addEventListener("click", () => showTutorial());
 bindUp.addEventListener("click", () => beginKeybindCapture("moveUp"));
 bindDown.addEventListener("click", () => beginKeybindCapture("moveDown"));
@@ -454,7 +456,7 @@ if (automationConfig.active) {
   queueMicrotask(() => showTutorial());
 }
 
-function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> = null, seedOverride?: string) {
+function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> = null, seedOverride?: string, startMsOverride?: number) {
   if (!automationConfig.active) void unlockAudio();
   if (!checkpoint) clearCheckpoint();
   currentMode = mode;
@@ -474,7 +476,7 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
     mode,
     seed: checkpoint?.seed || seedOverride || automationConfig.seed || (mode === "daily" ? dailySeed() : Date.now().toString(36)),
     debugSettings: checkpoint?.debug || getDebugSettingsFromControls(),
-    startMs: automationConfig.startMs,
+    startMs: startMsOverride ?? automationConfig.startMs,
     telemetryConfig: checkpoint?.telemetryConfig || getTelemetryConfig(),
     progression: currentProgression,
     checkpoint,

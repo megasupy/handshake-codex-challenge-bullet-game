@@ -1,4 +1,4 @@
-export type GameMode = "endless" | "daily";
+export type GameMode = "endless" | "daily" | "boss-rush";
 
 export type RunRecord = {
   id: string;
