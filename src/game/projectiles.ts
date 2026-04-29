@@ -16,8 +16,8 @@ export function firePlayerShot(
   const shot = scene.physics.add.image(x, y, "player-shot");
   const body = shot.body as Phaser.Physics.Arcade.Body;
   const speedScale = debug.playerProjectileSpeed / 620;
-  const vx = Math.cos(angle) * projectileSpeed * speedScale * debug.timeScale;
-  const vy = Math.sin(angle) * projectileSpeed * speedScale * debug.timeScale;
+  const vx = Math.cos(angle) * projectileSpeed * speedScale;
+  const vy = Math.sin(angle) * projectileSpeed * speedScale;
   body.setCircle(PLAYER_BULLET_RADIUS).setAllowGravity(false).setVelocity(vx, vy);
   shot.setData("vx", vx);
   shot.setData("vy", vy);
@@ -41,7 +41,7 @@ export function fireEnemyBullet(
   const texture = getEnemyBulletTexture(angle);
   const bullet = scene.physics.add.image(x, y, texture);
   const body = bullet.body as Phaser.Physics.Arcade.Body;
-  const finalSpeed = speed * debug.enemyBulletSpeedMultiplier * debug.timeScale;
+  const finalSpeed = speed * debug.enemyBulletSpeedMultiplier;
   const vx = Math.cos(angle) * finalSpeed;
   const vy = Math.sin(angle) * finalSpeed;
   body.setCircle(ENEMY_BULLET_RADIUS).setAllowGravity(false).setVelocity(vx, vy);

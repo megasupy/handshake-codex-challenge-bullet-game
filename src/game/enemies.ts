@@ -56,7 +56,7 @@ export function updateEnemies(args: {
     const body = enemy.body as Phaser.Physics.Arcade.Body;
     const data = enemy.getData("enemy") as EnemyData;
     const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, args.player.x, args.player.y);
-    body.setVelocity(Math.cos(angle) * data.speed * args.debug.timeScale, Math.sin(angle) * data.speed * args.debug.timeScale);
+    body.setVelocity(Math.cos(angle) * data.speed, Math.sin(angle) * data.speed);
 
     if (args.elapsedMs >= data.fireAt && data.kind !== "chaser") {
       firePattern(args.scene, args.enemyBullets, enemy, data.kind, args.threat, args.debug, args.player);

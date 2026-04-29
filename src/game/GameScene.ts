@@ -137,7 +137,7 @@ export class GameScene extends Phaser.Scene {
     });
     updateProjectiles(this.playerShots);
     updateProjectiles(this.enemyBullets);
-    magnetPickups(this.pickups, this.player, this.stats, this.physics, this.debug.timeScale);
+    magnetPickups(this.pickups, this.player, this.stats, this.physics, 1);
 
     if (this.elapsedMs >= this.nextUpgradeAt && !this.boss) this.openUpgradeChoice();
     if (this.telemetryConfig.maxRunMs > 0 && this.elapsedMs >= this.telemetryConfig.maxRunMs) {
@@ -205,6 +205,7 @@ export class GameScene extends Phaser.Scene {
   private syncTimeScale() {
     this.time.timeScale = this.debug.timeScale;
     this.tweens.timeScale = this.debug.timeScale;
+    this.physics.world.timeScale = 1 / Math.max(0.1, this.debug.timeScale);
   }
 
   private createGroups() {
@@ -263,7 +264,7 @@ export class GameScene extends Phaser.Scene {
 
     const isDashing = this.elapsedMs < this.dashUntil;
     const activeDirection = isDashing ? this.dashVector : direction;
-    const speed = (isDashing ? 760 : this.stats.speed) * this.debug.timeScale;
+    const speed = isDashing ? 760 : this.stats.speed;
 
     this.playerBody.setVelocity(activeDirection.x * speed, activeDirection.y * speed);
     if (direction.lengthSq() > 0) this.player.rotation = direction.angle();
@@ -287,7 +288,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private getAutoplayerDirection() {
-    const speed = (this.elapsedMs < this.dashUntil ? 760 : this.stats.speed) * this.debug.timeScale;
+    const speed = this.elapsedMs < this.dashUntil ? 760 : this.stats.speed;
     return this.autoplayer.chooseDirection({
       elapsedMs: this.elapsedMs,
       player: this.player,
@@ -295,21 +296,21 @@ export class GameScene extends Phaser.Scene {
       enemyBullets: this.enemyBullets,
       pickups: this.pickups,
       speed,
-      timeScale: this.debug.timeScale,
+      timeScale: 1,
     });
   }
 
   private shouldDash(direction: Phaser.Math.Vector2) {
     if (this.elapsedMs < this.dashAt || direction.lengthSq() === 0) return false;
     if (!this.debug.autoplayer) return Phaser.Input.Keyboard.JustDown(this.wasd.SPACE);
-    const dashSpeed = 760 * this.debug.timeScale;
+    const dashSpeed = 760;
     return this.autoplayer.shouldDash({
       player: this.player,
       direction,
       enemies: this.enemies,
       enemyBullets: this.enemyBullets,
       dashSpeed,
-      timeScale: this.debug.timeScale,
+      timeScale: 1,
     });
   }
 
@@ -437,7 +438,7 @@ export class GameScene extends Phaser.Scene {
     this.score += data.kind === "spinner" || data.kind === "bomber" ? 24 : 12;
     enemyDeathBurst(this, enemy.x, enemy.y, (enemy.getData("color") as number | undefined) ?? 0xfb7185);
     playSound("enemy-death");
-    if (this.rng.frac() > 0.2) createPickup(this, this.pickups, enemy.x, enemy.y, this.rng, this.debug.timeScale);
+    if (this.rng.frac() > 0.2) createPickup(this, this.pickups, enemy.x, enemy.y, this.rng, 1);
     enemy.destroy();
   }
 
