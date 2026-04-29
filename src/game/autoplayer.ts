@@ -14,6 +14,7 @@ export class Autoplayer {
   private direction = new Phaser.Math.Vector2(0, 0);
   private pickupTarget: Phaser.Physics.Arcade.Image | null = null;
   private nextDecisionAt = 0;
+  private bulletSampleOffset = 0;
   private lastTelemetry: AutoplayerTelemetry = {
     directionX: 0,
     directionY: 0,
@@ -39,6 +40,7 @@ export class Autoplayer {
     if (args.elapsedMs < this.nextDecisionAt) return this.direction.clone();
 
     const startedAt = performance.now();
+    this.bulletSampleOffset += 1;
     const horizons = [0.14, 0.3, 0.5, 0.75, 1.05];
     const activeBulletCount = args.enemyBullets.countActive(true);
     const activeEnemyCount = args.enemies.countActive(true);
@@ -50,15 +52,15 @@ export class Autoplayer {
     const nearestEnemyDistance = this.getNearestEnemyDistance(args.player.x, args.player.y, args.enemies);
     const nearestPickupDistance = pickupTarget ? Phaser.Math.Distance.Between(args.player.x, args.player.y, pickupTarget.x, pickupTarget.y) : Number.POSITIVE_INFINITY;
     const edgeDistance = Math.min(args.player.x, ARENA_WIDTH - args.player.x, args.player.y, ARENA_HEIGHT - args.player.y);
-    const prioritizeSurvival = currentDanger >= 1.8 || activeBulletCount >= 8 || activeEnemyCount >= 8;
+    const prioritizeSurvival = currentDanger >= 1.25 || activeBulletCount >= 6 || activeEnemyCount >= 7;
     const activePickupTarget = prioritizeSurvival ? null : pickupTarget;
 
     if (
       pickupTarget &&
       directPickupDirection &&
       this.shouldMoveDirectlyToPickup(args.player, pickupTarget, args.enemies, args.enemyBullets) &&
-      activeBulletCount < 10 &&
-      activeEnemyCount < 9 &&
+      activeBulletCount < 8 &&
+      activeEnemyCount < 8 &&
       !prioritizeSurvival
     ) {
       this.direction.copy(directPickupDirection);
@@ -89,7 +91,7 @@ export class Autoplayer {
         score += 8;
       }
       if (activePickupTarget && directPickupDirection && direction.lengthSq() > 0) {
-        const pickupBias = activeBulletCount > 12 ? 1.8 : 4.5;
+        const pickupBias = activeBulletCount > 10 ? 1.2 : 2.8;
         score -= Math.max(0, direction.dot(directPickupDirection)) * pickupBias;
       }
 
@@ -174,10 +176,10 @@ export class Autoplayer {
     if (pickupTarget) {
       const pickupRisk = this.getHazardScoreAt(pickupTarget.x, pickupTarget.y, enemies, enemyBullets, player);
       if (pickupRisk < 4.2) {
-        score -= Phaser.Math.Clamp(pickupProgress, -0.8, 1) * 18;
+        score -= Phaser.Math.Clamp(pickupProgress, -0.8, 1) * 13;
         score += pickupDistance / 90;
-        if (pickupDistance < 220) score -= ((220 - pickupDistance) / 220) * 10;
-        if (pickupDistance < 48) score -= 22;
+        if (pickupDistance < 220) score -= ((220 - pickupDistance) / 220) * 7;
+        if (pickupDistance < 48) score -= 14;
       }
     }
 
@@ -246,7 +248,7 @@ export class Autoplayer {
   ): boolean {
     const currentHazard = this.getHazardScoreAt(player.x, player.y, enemies, enemyBullets, player);
     const pickupHazard = this.getHazardScoreAt(pickup.x, pickup.y, enemies, enemyBullets, player);
-    if (currentHazard > 2.2 || pickupHazard > 3.8) return false;
+    if (currentHazard > 1.6 || pickupHazard > 2.7) return false;
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, pickup.x, pickup.y);
     const samples = Math.max(2, Math.ceil(distance / 110));
@@ -254,7 +256,7 @@ export class Autoplayer {
       const t = i / samples;
       const x = Phaser.Math.Linear(player.x, pickup.x, t);
       const y = Phaser.Math.Linear(player.y, pickup.y, t);
-      if (this.getHazardScoreAt(x, y, enemies, enemyBullets, player) > 3.2) return false;
+      if (this.getHazardScoreAt(x, y, enemies, enemyBullets, player) > 2.35) return false;
     }
 
     return true;
@@ -287,9 +289,10 @@ export class Autoplayer {
   private getBulletRiskAt(x: number, y: number, horizonSeconds: number, enemyBullets: Phaser.Physics.Arcade.Group): number {
     let risk = 0;
     const entries = enemyBullets.children.entries as Phaser.Physics.Arcade.Image[];
-    const step = Math.max(1, Math.ceil(entries.length / AUTOPLAYER_BULLET_SCAN_LIMIT));
+    const step = entries.length <= AUTOPLAYER_BULLET_SCAN_LIMIT ? 1 : Math.ceil(entries.length / AUTOPLAYER_BULLET_SCAN_LIMIT);
+    const start = step > 1 ? this.bulletSampleOffset % step : 0;
 
-    for (let i = 0; i < entries.length; i += step) {
+    for (let i = start; i < entries.length; i += step) {
       const bullet = entries[i];
       if (!bullet?.active) continue;
       const body = bullet.body as Phaser.Physics.Arcade.Body;
