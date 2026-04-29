@@ -14,6 +14,7 @@ import { magnetPickups } from "./pickups";
 import { firePlayerShot, updateProjectiles } from "./projectiles";
 import { TelemetryRecorder, toAutoplayerSample, type TelemetryConfig } from "./telemetry";
 import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpgradeOptions } from "./upgrades";
+import { applyProgression, type ProgressionState } from "../services/progression";
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Rectangle;
@@ -55,6 +56,7 @@ export class GameScene extends Phaser.Scene {
   private lastFrameMs = 0;
   private activeBossStartedAt: number | null = null;
   private initialElapsedMs = 0;
+  private initialProgression: ProgressionState | null = null;
   private playerShotsFired = 0;
   private playerShotsHit = 0;
 
@@ -62,10 +64,11 @@ export class GameScene extends Phaser.Scene {
     super("game");
   }
 
-  init(data: { mode?: GameMode; seed?: string; debugSettings?: Partial<DebugSettings>; telemetryConfig?: Partial<TelemetryConfig>; startMs?: number }) {
+  init(data: { mode?: GameMode; seed?: string; debugSettings?: Partial<DebugSettings>; telemetryConfig?: Partial<TelemetryConfig>; startMs?: number; progression?: ProgressionState }) {
     this.mode = data.mode || "endless";
     this.seed = data.seed || Date.now().toString(36);
     this.initialElapsedMs = Math.max(0, Number(data.startMs || 0));
+    this.initialProgression = data.progression || null;
     this.debug = mergeDebugSettings({ ...DEFAULT_DEBUG_SETTINGS }, data.debugSettings || {});
     this.telemetryConfig = {
       enabled: data.telemetryConfig?.enabled ?? false,
@@ -216,7 +219,7 @@ export class GameScene extends Phaser.Scene {
     this.activeBossStartedAt = null;
     this.playerShotsFired = 0;
     this.playerShotsHit = 0;
-    this.stats = { ...DEFAULT_PLAYER_STATS };
+    this.stats = this.initialProgression ? applyProgression({ ...DEFAULT_PLAYER_STATS }, this.initialProgression) : { ...DEFAULT_PLAYER_STATS };
     this.autoplayer.reset();
   }
 

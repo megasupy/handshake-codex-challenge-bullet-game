@@ -6,6 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { getSavedName } from "./services/localRuns";
+import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
 import type { GameMode, LeaderboardResult, RunRecord, RunSummary } from "./types";
 import type { TelemetryConfig, TelemetryRun } from "./game/telemetry";
 
@@ -40,6 +41,11 @@ const bossHud = mustGet("boss-hud");
 const bossName = mustGet("boss-name");
 const bossPhase = mustGet("boss-phase");
 const bossHealthFill = mustGet("boss-health-fill");
+const progressionShards = mustGet("progression-shards");
+const progressionSummary = mustGet("progression-summary");
+const progressionStats = mustGet("progression-stats");
+const progressionUpgrades = mustGet("progression-upgrades");
+const progressionReset = mustGetButton("progression-reset");
 const upgradeScreen = mustGet("upgrade-screen");
 const gameOver = mustGet("game-over");
 const leaderboardList = mustGet("leaderboard-list");
@@ -76,6 +82,7 @@ const debugControls = {
 let currentMode: GameMode = "endless";
 let lastRun: RunSummary | null = null;
 let currentUpgradeOptions: UpgradeOption[] = [];
+let currentProgression: ProgressionState = readProgression();
 
 if (automationConfig.autoplayer) localStorage.setItem(AUTOPLAYER_KEY, "true");
 playerNameInput.value = getSavedName();
@@ -89,6 +96,10 @@ menuButton.addEventListener("click", showMenu);
 submitButton.addEventListener("click", submitCurrentRun);
 debugToggle.addEventListener("click", () => debugPanel.classList.toggle("hidden"));
 debugClose.addEventListener("click", () => hide(debugPanel));
+progressionReset.addEventListener("click", () => {
+  currentProgression = resetProgression();
+  renderProgressionPanel();
+});
 mustGetButton("debug-apply-time").addEventListener("click", () => getGameScene()?.setElapsedSeconds(Number(debugControls.time.value) || 0));
 mustGetButton("debug-clear").addEventListener("click", () => getGameScene()?.clearThreats());
 mustGetButton("debug-kill").addEventListener("click", () => getGameScene()?.forceEndRun());
@@ -153,13 +164,15 @@ gameEvents.addEventListener("upgrade", (event) => {
 
 gameEvents.addEventListener("game-over", (event) => {
   lastRun = (event as CustomEvent<RunSummary>).detail;
+  currentProgression = grantRunReward(lastRun);
   text("game-over-status", lastRun.survivalMs >= 60000 ? "Storm survived" : "Run ended");
   text("final-score", lastRun.score.toLocaleString());
   text("final-time", `${(lastRun.survivalMs / 1000).toFixed(1)}s`);
   text("final-kills", `${lastRun.kills} kills`);
   text("final-threat", `Threat ${lastRun.maxThreatLevel}`);
-  submitStatus.textContent = "Score saved after submit. Local fallback is always available.";
+  submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
+  renderProgressionPanel();
   show(gameOver);
   hideHud();
   hideBossHud();
@@ -199,6 +212,7 @@ gameEvents.addEventListener("automation-snapshot", (event) => {
 });
 
 void refreshLeaderboard("endless");
+renderProgressionPanel();
 if (automationConfig.active) {
   queueMicrotask(() => startRun(automationConfig.mode));
 } else if (debugControls.autoplayer.checked) {
@@ -222,6 +236,7 @@ function startRun(mode: GameMode) {
     debugSettings: getDebugSettingsFromControls(),
     startMs: automationConfig.startMs,
     telemetryConfig: getTelemetryConfig(),
+    progression: currentProgression,
   });
   applyDebugControls();
 }
@@ -234,6 +249,7 @@ async function showMenu() {
   hideHud();
   hideBossHud();
   show(menu);
+  renderProgressionPanel();
   game.scene.stop("game");
   await refreshLeaderboard(currentMode);
 }
@@ -243,6 +259,11 @@ function chooseUpgrade(id: string) {
   currentUpgradeOptions = [];
   const scene = game.scene.getScene("game") as GameScene;
   scene.applyUpgrade(id);
+}
+
+function purchaseProgressionUpgrade(id: string) {
+  currentProgression = buyUpgrade(id as ProgressionUpgradeId);
+  renderProgressionPanel();
 }
 
 function applyDebugControls() {
@@ -356,6 +377,53 @@ function renderLeaderboard(result: LeaderboardResult) {
   }
 
   rows.forEach((run, index) => leaderboardList.append(createLeaderboardRow(run, index)));
+}
+
+function renderProgressionPanel() {
+  progressionShards.textContent = `${currentProgression.shards} shards`;
+  progressionSummary.textContent = formatProgressionSummary(currentProgression);
+  progressionStats.innerHTML = "";
+
+  const stats: Record<string, string | number> = {
+    runs: currentProgression.totalRuns,
+    score: currentProgression.totalScore.toLocaleString(),
+    survival: `${(currentProgression.totalSurvivalMs / 1000).toFixed(1)}s`,
+    highest: currentProgression.highestThreat,
+  };
+
+  for (const [label, value] of Object.entries(stats)) {
+    const stat = document.createElement("div");
+    stat.className = "debug-stat";
+    stat.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    progressionStats.append(stat);
+  }
+
+  progressionUpgrades.innerHTML = "";
+  for (const upgrade of PROGRESSION_UPGRADES) {
+    const level = currentProgression.upgrades[upgrade.id];
+    const costValue = getUpgradeCost(upgrade.id, level);
+    const cost = level >= upgrade.maxLevel ? "max" : `${costValue} shards`;
+    const button = document.createElement("button");
+    button.className = "progression-card";
+    button.disabled = level >= upgrade.maxLevel || currentProgression.shards < costValue;
+    button.innerHTML = `
+      <div class="flex items-center justify-between gap-3">
+        <strong class="text-sm font-black text-white">${upgrade.title}</strong>
+        <span class="rounded-full border border-line px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-pulse">Lv ${level}/${upgrade.maxLevel}</span>
+      </div>
+      <p class="mt-2 text-left text-xs leading-5 text-slate-300">${upgrade.description}</p>
+      <div class="mt-3 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+        <span>${cost}</span>
+        <span>${level >= upgrade.maxLevel ? "Unlocked" : "Buy"}</span>
+      </div>
+    `;
+    if (level < upgrade.maxLevel) {
+      button.addEventListener("click", () => {
+        purchaseProgressionUpgrade(upgrade.id);
+      });
+    }
+    progressionUpgrades.append(button);
+  }
 }
 
 function createLeaderboardRow(run: RunRecord, index: number) {
