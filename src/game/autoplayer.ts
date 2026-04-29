@@ -51,6 +51,7 @@ export class Autoplayer {
     const currentDanger = this.getHazardScoreAt(args.player.x, args.player.y, args.enemies, args.enemyBullets, args.player, scale);
     const nearestEnemyDistance = this.getNearestEnemyDistance(args.player.x, args.player.y, args.enemies);
     const nearestPickupDistance = pickupTarget ? Phaser.Math.Distance.Between(args.player.x, args.player.y, pickupTarget.x, pickupTarget.y) : Number.POSITIVE_INFINITY;
+    const edgeDistance = Math.min(args.player.x, ARENA_WIDTH - args.player.x, args.player.y, ARENA_HEIGHT - args.player.y);
     const prioritizeSurvival = currentDanger >= 1.8 || activeBulletCount >= 8 || activeEnemyCount >= 8;
     const activePickupTarget = prioritizeSurvival ? null : pickupTarget;
 
@@ -101,6 +102,13 @@ export class Autoplayer {
     }
 
     this.direction.copy(bestDirection.lengthSq() > 0 ? bestDirection.clone().normalize() : Phaser.Math.Vector2.ZERO);
+    if (edgeDistance < 130 && currentDanger < 9 && nearestPickupDistance > 170) {
+      const centerDirection = new Phaser.Math.Vector2(ARENA_WIDTH / 2 - args.player.x, ARENA_HEIGHT / 2 - args.player.y).normalize();
+      this.direction.copy(centerDirection);
+      this.finishDecision("edge-reset", currentDanger, currentDanger, nearestPickupDistance, nearestEnemyDistance, pickupTarget, startedAt);
+      this.nextDecisionAt = args.elapsedMs + AUTOPLAYER_DECISION_INTERVAL_MS;
+      return this.direction.clone();
+    }
     const projectedHorizon = 0.28 / scale;
     const projectedX = Phaser.Math.Clamp(args.player.x + this.direction.x * args.speed * projectedHorizon, 22, ARENA_WIDTH - 22);
     const projectedY = Phaser.Math.Clamp(args.player.y + this.direction.y * args.speed * projectedHorizon, 22, ARENA_HEIGHT - 22);
@@ -153,8 +161,9 @@ export class Autoplayer {
     else if (edge < 140) edgePenalty = ((140 - edge) / 140) * 18;
 
     if (pickupTarget && pickupEdge < 90 && (pickupDistance < 155 || pickupProgress > 0.18)) {
-      edgePenalty *= 0.08;
+      edgePenalty *= 0.3;
     }
+    if (edge < 160) score += ((160 - edge) / 160) * 12;
     score += edgePenalty;
 
     score += this.getBulletRiskAt(x, y, horizonSeconds, enemyBullets, timeScale);
