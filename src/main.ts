@@ -151,6 +151,7 @@ const leaderboardSource = mustGet("leaderboard-source");
 const leaderboardModeEndless = mustGetButton("leaderboard-mode-endless");
 const leaderboardModeDaily = mustGetButton("leaderboard-mode-daily");
 const leaderboardRefresh = mustGetButton("leaderboard-refresh");
+const leaderboardExport = mustGetButton("leaderboard-export");
 const selectedBoardSync = mustGet("selected-board-sync");
 const selectedBoardSummary = mustGet("selected-board-summary");
 const selectedBoardComparison = mustGet("selected-board-comparison");
@@ -359,6 +360,7 @@ selectedRunCopyReport.addEventListener("click", async () => {
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
 leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(leaderboardMode));
+leaderboardExport.addEventListener("click", () => exportLeaderboardCsv());
 leaderboardModeEndless.addEventListener("click", () => {
   leaderboardMode = "endless";
   writeLeaderboardMode(leaderboardMode);
@@ -916,6 +918,43 @@ function renderLeaderboard(result: LeaderboardResult) {
   renderSelectedBoardPanel();
 }
 
+async function exportLeaderboardCsv() {
+  const rows = currentLeaderboardRows.length > 0 ? currentLeaderboardRows : await getLeaderboard(leaderboardMode).then((result) => result.rows);
+  if (rows.length === 0) {
+    showToast("No leaderboard rows to export.", "error");
+    return;
+  }
+
+  const csv = [
+    ["player", "mode", "survivalMs", "score", "kills", "threat", "seed", "synced", "createdAt"],
+    ...rows.map((run) => [
+      run.playerName,
+      run.mode,
+      String(run.survivalMs),
+      String(run.score),
+      String(run.kills),
+      String(run.maxThreatLevel),
+      run.seed,
+      run.synced ? "yes" : "no",
+      run.createdAt,
+    ]),
+  ].map((row) => row.map(escapeCsv).join(",")).join("\n");
+
+  try {
+    await navigator.clipboard.writeText(csv);
+    showToast("Leaderboard CSV copied.", "success");
+  } catch {
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `leaderboard-${leaderboardMode}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showToast("Leaderboard CSV downloaded.", "success");
+  }
+}
+
 function renderProgressionPanel() {
   progressionShards.textContent = `${currentProgression.shards} shards`;
   progressionSummary.textContent = formatProgressionSummary(currentProgression);
@@ -1176,6 +1215,11 @@ function compareLocalRuns(a: RunRecord, b: RunRecord): number {
   if (b.survivalMs !== a.survivalMs) return b.survivalMs - a.survivalMs;
   if (b.score !== a.score) return b.score - a.score;
   return b.kills - a.kills;
+}
+
+function escapeCsv(value: string): string {
+  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
 }
 
 function matchesRunSearch(run: RunRecord): boolean {
