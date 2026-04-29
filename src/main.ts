@@ -145,6 +145,7 @@ const runSummary = mustGet("run-summary");
 const runStyle = mustGet("run-style");
 const runDamage = mustGet("run-damage");
 const runUpgradePath = mustGet("run-upgrade-path");
+const runAdvice = mustGet("run-advice");
 const runComparison = mustGet("run-comparison");
 const runSeed = mustGet("run-seed");
 const leaderboardList = mustGet("leaderboard-list");
@@ -653,6 +654,7 @@ gameEvents.addEventListener("game-over", (event) => {
   renderRunStyle(lastRun);
   renderRunDamage(lastRun);
   renderRunUpgradePath(lastRun);
+  renderRunAdvice(lastRun);
   renderRunComparison(lastRun, previousRecords);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
@@ -1476,6 +1478,11 @@ function renderRunUpgradePath(run: RunSummary) {
   }
 }
 
+function renderRunAdvice(run: RunSummary) {
+  const advice = getRunAdvice(run);
+  runAdvice.textContent = advice;
+}
+
 function renderRunComparison(run: RunSummary, previous: RecordsState) {
   runComparison.innerHTML = "";
   const rows: Array<[string, string | number]> = [
@@ -1906,9 +1913,36 @@ function buildRunReport(run: RunSummary): string {
     `damageCornered: ${run.damageCornered ?? 0}`,
     `damageBossContact: ${run.damageBossContact ?? 0}`,
     `upgradePath: ${(run.upgradePath || []).join(" > ") || "none"}`,
+    `advice: ${getRunAdvice(run)}`,
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
   ];
   return lines.join("\n");
+}
+
+function getRunAdvice(run: RunSummary): string {
+  const damageTaken = run.damageTaken ?? 0;
+  const bosses = run.bossesDefeated ?? 0;
+  const projectiles = run.playerProjectiles ?? 1;
+  const fireRate = run.playerFireRate ?? 0;
+  const speed = run.speed ?? 0;
+  const upgradePath = run.upgradePath || [];
+
+  if (damageTaken >= 6 && (run.damageBurst ?? 0) >= damageTaken / 2) {
+    return "You are taking too many burst hits. Prioritize projectile count, pierce, and a safer route through open lanes.";
+  }
+  if ((run.damageCornered ?? 0) > (run.damageAttrition ?? 0)) {
+    return "Corner pressure is the issue. Faster movement or more pickup range will help you stay out of dead lanes.";
+  }
+  if (bosses > 0 && fireRate > 180 && projectiles <= 2) {
+    return "Boss damage is low. Add fire rate or projectile count earlier so boss phases collapse faster.";
+  }
+  if (upgradePath.length > 0 && !upgradePath.includes("Repair Kit") && !upgradePath.includes("Patch Job") && (run.maxHealth ?? 3) <= 3) {
+    return "This build is fragile. Mix in one health or heal pick before threat climbs again.";
+  }
+  if (speed < 300 && projectiles >= 4) {
+    return "Your damage is ahead of your movement. Use one speed or dash upgrade to keep the build safe.";
+  }
+  return "Balanced build. Keep steering toward either cleaner damage or more movement, but not both at the expense of survivability.";
 }
 
 function buildRunRecordReport(run: RunRecord): string {
