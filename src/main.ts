@@ -6,7 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
-import { getPendingRuns, getSavedName, isRunPinned, readPinnedRunIds, readRuns, sortRunsWithPinned, toggleRunPinned } from "./services/localRuns";
+import { getPendingRuns, getSavedName, isRunPinned, readPinnedRunIds, readRuns, removeRun, sortRunsWithPinned, toggleRunPinned } from "./services/localRuns";
 import { formatKeybindSummary, readKeybinds, resetKeybinds, updateKeybind, type KeybindAction, type KeybindState } from "./services/keybinds";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
@@ -77,6 +77,7 @@ const selectedRunReplay = mustGetButton("selected-run-replay");
 const selectedRunCopySeed = mustGetButton("selected-run-copy-seed");
 const selectedRunCopyLink = mustGetButton("selected-run-copy-link");
 const selectedRunCopyReport = mustGetButton("selected-run-copy-report");
+const selectedRunDelete = mustGetButton("selected-run-delete");
 const achievementsCount = mustGet("achievements-count");
 const achievementsSummary = mustGet("achievements-summary");
 const achievementsList = mustGet("achievements-list");
@@ -162,6 +163,7 @@ const selectedBoardReplay = mustGetButton("selected-board-replay");
 const selectedBoardCopySeed = mustGetButton("selected-board-copy-seed");
 const selectedBoardCopyLink = mustGetButton("selected-board-copy-link");
 const selectedBoardCopyReport = mustGetButton("selected-board-copy-report");
+const selectedBoardDelete = mustGetButton("selected-board-delete");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
@@ -359,6 +361,14 @@ selectedRunCopyReport.addEventListener("click", async () => {
     showToast("Selected run report copy failed.", "error");
   }
 });
+selectedRunDelete.addEventListener("click", () => {
+  if (!selectedRecentRun) return;
+  removeRun(selectedRecentRun.id);
+  selectedRecentRun = null;
+  renderRecentRunsPanel();
+  renderSelectedRunPanel();
+  showToast("Selected run deleted.", "success");
+});
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
 leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(leaderboardMode));
@@ -422,6 +432,15 @@ selectedBoardCopyReport.addEventListener("click", async () => {
   } catch {
     showToast("Leaderboard run report copy failed.", "error");
   }
+});
+selectedBoardDelete.addEventListener("click", () => {
+  if (!selectedBoardRun) return;
+  removeRun(selectedBoardRun.id);
+  selectedBoardRun = null;
+  void refreshLeaderboard(leaderboardMode);
+  renderSelectedBoardPanel();
+  renderRecentRunsPanel();
+  showToast("Leaderboard run deleted.", "success");
 });
 submitButton.addEventListener("click", submitCurrentRun);
 debugToggle.addEventListener("click", () => debugPanel.classList.toggle("hidden"));

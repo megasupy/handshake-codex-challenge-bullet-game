@@ -23,6 +23,11 @@ export function saveLocalRun(run: RunRecord): void {
   writeRuns(sortRuns(runs));
 }
 
+export function removeRun(id: string): void {
+  writeRuns(readRuns().filter((run) => run.id !== id));
+  writePinnedRunIds(readPinnedRunIds().filter((runId) => runId !== id));
+}
+
 export function markRunSynced(id: string): void {
   writeRuns(readRuns().map((run) => (run.id === id ? { ...run, synced: true } : run)));
 }
