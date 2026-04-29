@@ -274,15 +274,22 @@ export class GameScene extends Phaser.Scene {
     this.playerBody.setVelocity(activeDirection.x * speed, activeDirection.y * speed);
     if (direction.lengthSq() > 0) this.player.rotation = direction.angle();
 
-    const visible = this.elapsedMs > this.invulnerableUntil || Math.floor(this.elapsedMs / 90) % 2 === 0;
+    const visible = this.elapsedMs > this.invulnerableUntil || Math.floor(this.elapsedMs / 70) % 2 === 0;
     this.player.setVisible(visible);
-    this.player.setFillStyle(0x5eead4);
+    this.player.setFillStyle(isDashing ? 0xf8fafc : 0x5eead4);
+    this.player.setStrokeStyle(2, isDashing ? 0xfacc15 : 0xffffff, isDashing ? 1 : 0.9);
     this.dashIndicator.setPosition(this.player.x, this.player.y);
     const dashReady = this.elapsedMs >= this.dashAt;
     this.dashIndicator.setVisible(visible);
-    this.dashIndicator.setFillStyle(dashReady ? 0xfde047 : 0x475569, dashReady ? 1 : 0.9);
-    this.dashIndicator.setStrokeStyle(1, dashReady ? 0xffffff : 0x94a3b8, dashReady ? 0.9 : 0.45);
-    this.dashIndicator.setAlpha(dashReady ? 1 : 0.55);
+    if (isDashing) {
+      this.dashIndicator.setFillStyle(0xfacc15, 1);
+      this.dashIndicator.setStrokeStyle(1, 0xffffff, 1);
+      this.dashIndicator.setAlpha(1);
+    } else {
+      this.dashIndicator.setFillStyle(dashReady ? 0xfde047 : 0x475569, dashReady ? 1 : 0.9);
+      this.dashIndicator.setStrokeStyle(1, dashReady ? 0xffffff : 0x94a3b8, dashReady ? 0.9 : 0.45);
+      this.dashIndicator.setAlpha(dashReady ? 1 : 0.55);
+    }
     this.playerBody.setMaxVelocity(speed + delta);
   }
 
@@ -328,6 +335,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.debug.autoplayer && direction.lengthSq() === 0) this.dashVector.copy(this.lastManualDirection);
     else this.dashVector.copy(direction);
     this.dashUntil = this.elapsedMs + 155;
+    this.invulnerableUntil = Math.max(this.invulnerableUntil, this.dashUntil);
     this.dashAt = this.elapsedMs + this.stats.dashCooldown;
     this.telemetry?.logEvent(this.elapsedMs, "dash", { x: round(this.player.x), y: round(this.player.y) });
     this.tweens.add({ targets: this.player, alpha: 0.35, yoyo: true, duration: 80 });
