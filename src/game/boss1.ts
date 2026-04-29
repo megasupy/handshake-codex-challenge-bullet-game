@@ -11,17 +11,33 @@ export const BOSS_RESPAWN_DELAY_MS = 60000;
 
 type Phase = 1 | 2 | 3;
 
+export type SerializedBossState = {
+  bossId: 1 | 2 | 3;
+  maxHp: number;
+  hp: number;
+  phase: Phase;
+  x: number;
+  y: number;
+  bornAt: number;
+  phaseDamage: number;
+  phaseDamageRequired: number[];
+  attackAt: number;
+  hitFlashUntil: number;
+  attackIndex: number;
+  currentPatternId: string;
+};
+
 export class Boss1Controller {
   readonly name: string;
   readonly bossId: 1 | 2 | 3;
-  readonly maxHp: number;
+  maxHp: number;
   hp: number;
   phase: Phase = 1;
   x = ARENA_WIDTH / 2;
   y = 132;
 
   private readonly bornAt: number;
-  private readonly phaseDamageRequired: number[];
+  private phaseDamageRequired: number[];
   private phaseDamage = 0;
   private attackAt = 0;
   private hitFlashUntil = 0;
@@ -40,6 +56,41 @@ export class Boss1Controller {
     this.attackAt = elapsedMs + 850;
     this.view = scene.add.graphics();
     this.redraw(elapsedMs);
+  }
+
+  static fromState(scene: Phaser.Scene, state: SerializedBossState): Boss1Controller {
+    const boss = new Boss1Controller(scene, state.bornAt, 0, state.bossId, 1);
+    boss.maxHp = state.maxHp;
+    boss.hp = state.hp;
+    boss.phase = state.phase;
+    boss.x = state.x;
+    boss.y = state.y;
+    boss.phaseDamageRequired = [...state.phaseDamageRequired];
+    boss.phaseDamage = state.phaseDamage;
+    boss.attackAt = state.attackAt;
+    boss.hitFlashUntil = state.hitFlashUntil;
+    boss.attackIndex = state.attackIndex;
+    boss.currentPatternId = state.currentPatternId;
+    boss.redraw(state.bornAt);
+    return boss;
+  }
+
+  toState(): SerializedBossState {
+    return {
+      bossId: this.bossId,
+      maxHp: this.maxHp,
+      hp: this.hp,
+      phase: this.phase,
+      x: this.x,
+      y: this.y,
+      bornAt: this.bornAt,
+      phaseDamage: this.phaseDamage,
+      phaseDamageRequired: [...this.phaseDamageRequired],
+      attackAt: this.attackAt,
+      hitFlashUntil: this.hitFlashUntil,
+      attackIndex: this.attackIndex,
+      currentPatternId: this.currentPatternId,
+    };
   }
 
   update(elapsedMs: number, player: Phaser.GameObjects.Shape, enemyBullets: Phaser.Physics.Arcade.Group, debug: DebugSettings) {

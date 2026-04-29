@@ -5,6 +5,7 @@ import { GameScene } from "./game/GameScene";
 import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
+import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
 import { getSavedName } from "./services/localRuns";
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
 import type { GameMode, LeaderboardResult, RunRecord, RunSummary } from "./types";
@@ -43,6 +44,7 @@ const bossPhase = mustGet("boss-phase");
 const bossHealthFill = mustGet("boss-health-fill");
 const progressionShards = mustGet("progression-shards");
 const progressionSummary = mustGet("progression-summary");
+const checkpointSummary = mustGet("checkpoint-summary");
 const progressionStats = mustGet("progression-stats");
 const progressionUpgrades = mustGet("progression-upgrades");
 const progressionReset = mustGetButton("progression-reset");
@@ -51,6 +53,7 @@ const gameOver = mustGet("game-over");
 const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
 const playButton = mustGetButton("play-button");
+const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
 const submitButton = mustGetButton("submit-button");
 const restartButton = mustGetButton("restart-button");
@@ -90,6 +93,11 @@ debugControls.autoplayer.checked = automationConfig.autoplayer || localStorage.g
 if (automationConfig.timeScale !== null) debugControls.timeScale.value = automationConfig.timeScale.toString();
 
 playButton.addEventListener("click", () => startRun("endless"));
+resumeButton.addEventListener("click", () => {
+  const checkpoint = readCheckpoint();
+  if (!checkpoint) return;
+  startRun(checkpoint.mode, checkpoint);
+});
 dailyButton.addEventListener("click", () => startRun("daily"));
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
@@ -178,6 +186,7 @@ gameEvents.addEventListener("game-over", (event) => {
   hideBossHud();
   hide(debugToggle);
   hide(debugPanel);
+  refreshCheckpointUi();
 });
 
 gameEvents.addEventListener("boss-hud", (event) => {
@@ -213,14 +222,16 @@ gameEvents.addEventListener("automation-snapshot", (event) => {
 
 void refreshLeaderboard("endless");
 renderProgressionPanel();
+refreshCheckpointUi();
 if (automationConfig.active) {
   queueMicrotask(() => startRun(automationConfig.mode));
 } else if (debugControls.autoplayer.checked) {
   queueMicrotask(() => startRun("endless"));
 }
 
-function startRun(mode: GameMode) {
+function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> = null) {
   if (!automationConfig.active) void unlockAudio();
+  if (!checkpoint) clearCheckpoint();
   currentMode = mode;
   lastRun = null;
   hide(menu);
@@ -232,13 +243,14 @@ function startRun(mode: GameMode) {
   hideBossHud();
   game.scene.start("game", {
     mode,
-    seed: automationConfig.seed || (mode === "daily" ? dailySeed() : Date.now().toString(36)),
+    seed: checkpoint?.seed || automationConfig.seed || (mode === "daily" ? dailySeed() : Date.now().toString(36)),
     debugSettings: getDebugSettingsFromControls(),
     startMs: automationConfig.startMs,
-    telemetryConfig: getTelemetryConfig(),
+    telemetryConfig: checkpoint?.telemetryConfig || getTelemetryConfig(),
     progression: currentProgression,
+    checkpoint,
   });
-  applyDebugControls();
+  if (!checkpoint) applyDebugControls();
 }
 
 async function showMenu() {
@@ -251,6 +263,7 @@ async function showMenu() {
   show(menu);
   renderProgressionPanel();
   game.scene.stop("game");
+  refreshCheckpointUi();
   await refreshLeaderboard(currentMode);
 }
 
@@ -424,6 +437,12 @@ function renderProgressionPanel() {
     }
     progressionUpgrades.append(button);
   }
+}
+
+function refreshCheckpointUi() {
+  const checkpoint = readCheckpoint();
+  resumeButton.disabled = !checkpoint;
+  checkpointSummary.textContent = describeCheckpoint(checkpoint);
 }
 
 function createLeaderboardRow(run: RunRecord, index: number) {

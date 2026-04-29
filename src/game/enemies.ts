@@ -7,6 +7,18 @@ import { fireEnemyBullet } from "./projectiles";
 
 type EnemyShape = Phaser.GameObjects.Shape & Phaser.GameObjects.GameObject;
 
+export type SerializedEnemyState = {
+  kind: EnemyKind;
+  x: number;
+  y: number;
+  hp: number;
+  speed: number;
+  fireAt: number;
+  casts: number;
+  vx: number;
+  vy: number;
+};
+
 type WaveBlock = {
   durationMs: number;
   mix: Partial<Record<EnemyKind, number>>;
@@ -117,6 +129,27 @@ export function updateEnemies(args: {
     }
     return true;
   });
+}
+
+export function restoreEnemyFromState(
+  scene: Phaser.Scene,
+  enemies: Phaser.Physics.Arcade.Group,
+  state: SerializedEnemyState,
+): void {
+  const { color, radius } = styleEnemy(state.kind);
+  const enemy = createEnemyShape(scene, state.kind, state.x, state.y, radius, color);
+  scene.physics.add.existing(enemy);
+  const body = enemy.body as Phaser.Physics.Arcade.Body;
+  body.setCircle(radius).setCollideWorldBounds(true).setVelocity(state.vx, state.vy);
+  enemy.setData("enemy", {
+    kind: state.kind,
+    hp: state.hp,
+    speed: state.speed,
+    fireAt: state.fireAt,
+    casts: state.casts,
+  } satisfies EnemyData);
+  enemy.setData("color", color);
+  enemies.add(enemy);
 }
 
 export function firePattern(

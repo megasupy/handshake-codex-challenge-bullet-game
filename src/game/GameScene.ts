@@ -7,14 +7,15 @@ import { BOSS_RESPAWN_DELAY_MS, Boss1Controller, FIRST_BOSS_AT_MS, SECOND_BOSS_A
 import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_DEBUG_SETTINGS, DEFAULT_PLAYER_STATS, TELEMETRY_SAMPLE_INTERVAL_MS, UPGRADE_INTERVAL_MS } from "./constants";
 import { applyDebugSettings as mergeDebugSettings } from "./debug";
 import { dashTrail, enemyDeathBurst, flashEnemy, pickupCollectBurst, playerHitBurst, upgradePulse } from "./effects";
-import { createPickup, firePattern, getEnemyWaveStep, spawnEnemyIfReady, updateEnemies } from "./enemies";
-import { emitAutomationComplete, emitAutomationSnapshot, emitBossHud, emitDebugStats, emitGameOver, emitHud, emitUpgrade, type DebugSettings } from "./events";
+import { createPickup, firePattern, getEnemyWaveStep, restoreEnemyFromState, spawnEnemyIfReady, updateEnemies } from "./enemies";
+import { emitAutomationComplete, emitAutomationSnapshot, emitBossHud, emitDebugStats, emitGameOver, emitHud, emitUpgrade, type DebugSettings, type UpgradeOption } from "./events";
 import type { EnemyData } from "./gameTypes";
-import { magnetPickups } from "./pickups";
-import { firePlayerShot, updateProjectiles } from "./projectiles";
+import { magnetPickups, restorePickup } from "./pickups";
+import { firePlayerShot, restoreEnemyBullet, restorePlayerShot, updateProjectiles } from "./projectiles";
 import { TelemetryRecorder, toAutoplayerSample, type TelemetryConfig } from "./telemetry";
 import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpgradeOptions } from "./upgrades";
 import { applyProgression, type ProgressionState } from "../services/progression";
+import { clearCheckpoint, writeCheckpoint, type CheckpointState } from "../services/checkpoint";
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Rectangle;
@@ -44,6 +45,7 @@ export class GameScene extends Phaser.Scene {
   private dashVector = new Phaser.Math.Vector2(1, 0);
   private lastManualDirection = new Phaser.Math.Vector2(1, 0);
   private pausedForUpgrade = false;
+  private pendingUpgradeOptions: UpgradeOption[] | null = null;
   private nextUpgradeAt = UPGRADE_INTERVAL_MS;
   private nextBossAt = FIRST_BOSS_AT_MS;
   private bossEncountersSpawned = 0;
@@ -57,32 +59,35 @@ export class GameScene extends Phaser.Scene {
   private activeBossStartedAt: number | null = null;
   private initialElapsedMs = 0;
   private initialProgression: ProgressionState | null = null;
+  private resumeCheckpoint: CheckpointState | null = null;
   private playerShotsFired = 0;
   private playerShotsHit = 0;
+  private checkpointSaveAt = 0;
+  private runEnded = false;
 
   constructor() {
     super("game");
   }
 
-  init(data: { mode?: GameMode; seed?: string; debugSettings?: Partial<DebugSettings>; telemetryConfig?: Partial<TelemetryConfig>; startMs?: number; progression?: ProgressionState }) {
+  init(data: { mode?: GameMode; seed?: string; debugSettings?: Partial<DebugSettings>; telemetryConfig?: Partial<TelemetryConfig>; startMs?: number; progression?: ProgressionState; checkpoint?: CheckpointState }) {
     this.mode = data.mode || "endless";
-    this.seed = data.seed || Date.now().toString(36);
-    this.initialElapsedMs = Math.max(0, Number(data.startMs || 0));
-    this.initialProgression = data.progression || null;
+    this.seed = data.checkpoint?.seed || data.seed || Date.now().toString(36);
+    this.initialElapsedMs = data.checkpoint?.elapsedMs ?? Math.max(0, Number(data.startMs || 0));
+    this.initialProgression = data.checkpoint?.initialProgression || data.progression || null;
+    this.resumeCheckpoint = data.checkpoint || null;
     this.debug = mergeDebugSettings({ ...DEFAULT_DEBUG_SETTINGS }, data.debugSettings || {});
     this.telemetryConfig = {
-      enabled: data.telemetryConfig?.enabled ?? false,
-      sampleIntervalMs: data.telemetryConfig?.sampleIntervalMs ?? TELEMETRY_SAMPLE_INTERVAL_MS,
-      snapshotIntervalMs: data.telemetryConfig?.snapshotIntervalMs ?? 3000,
-      maxRunMs: data.telemetryConfig?.maxRunMs ?? 0,
-      runId: data.telemetryConfig?.runId ?? `${this.mode}-${this.seed}`,
-      exportToDom: data.telemetryConfig?.exportToDom ?? false,
+      enabled: data.checkpoint?.telemetryConfig.enabled ?? data.telemetryConfig?.enabled ?? false,
+      sampleIntervalMs: data.checkpoint?.telemetryConfig.sampleIntervalMs ?? data.telemetryConfig?.sampleIntervalMs ?? TELEMETRY_SAMPLE_INTERVAL_MS,
+      snapshotIntervalMs: data.checkpoint?.telemetryConfig.snapshotIntervalMs ?? data.telemetryConfig?.snapshotIntervalMs ?? 3000,
+      maxRunMs: data.checkpoint?.telemetryConfig.maxRunMs ?? data.telemetryConfig?.maxRunMs ?? 0,
+      runId: data.checkpoint?.telemetryConfig.runId ?? data.telemetryConfig?.runId ?? `${this.mode}-${this.seed}`,
+      exportToDom: data.checkpoint?.telemetryConfig.exportToDom ?? data.telemetryConfig?.exportToDom ?? false,
     };
   }
 
   create() {
     this.resetRunState();
-    if (this.initialElapsedMs > 0) this.setElapsedSeconds(this.initialElapsedMs / 1000);
     this.rng = new Phaser.Math.RandomDataGenerator([this.seed]);
 
     createArenaBackground(this);
@@ -92,6 +97,11 @@ export class GameScene extends Phaser.Scene {
     this.createInput();
     this.syncTimeScale();
     this.createCollisions();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
+
+    if (this.resumeCheckpoint) this.restoreCheckpoint(this.resumeCheckpoint);
+    else if (this.initialElapsedMs > 0) this.setElapsedSeconds(this.initialElapsedMs / 1000);
+
     this.telemetry = this.telemetryConfig.enabled
       ? new TelemetryRecorder(this.telemetryConfig.runId, this.seed, this.mode, {
           autoplayer: this.debug.autoplayer,
@@ -101,7 +111,7 @@ export class GameScene extends Phaser.Scene {
           timeScale: this.debug.timeScale,
         })
       : null;
-    this.telemetry?.logEvent(0, "run-start", { seed: this.seed, mode: this.mode });
+    this.telemetry?.logEvent(this.elapsedMs, "run-start", { seed: this.seed, mode: this.mode, resumed: Boolean(this.resumeCheckpoint) });
 
     emitHud(this.getHud());
   }
@@ -162,6 +172,7 @@ export class GameScene extends Phaser.Scene {
     this.emitBossState();
     emitDebugStats(this.getDebugStats());
     this.recordTelemetrySample();
+    if (this.elapsedMs >= this.checkpointSaveAt) this.saveCheckpoint();
   }
 
   applyDebugSettings(settings: Partial<DebugSettings>) {
@@ -172,6 +183,7 @@ export class GameScene extends Phaser.Scene {
   setElapsedSeconds(seconds: number) {
     this.elapsedMs = Math.max(0, seconds * 1000);
     this.nextUpgradeAt = Math.max(this.elapsedMs + 1000, Math.ceil(this.elapsedMs / UPGRADE_INTERVAL_MS) * UPGRADE_INTERVAL_MS);
+    this.checkpointSaveAt = this.elapsedMs + 2000;
   }
 
   clearThreats() {
@@ -219,6 +231,8 @@ export class GameScene extends Phaser.Scene {
     this.activeBossStartedAt = null;
     this.playerShotsFired = 0;
     this.playerShotsHit = 0;
+    this.checkpointSaveAt = 2000;
+    this.runEnded = false;
     this.stats = this.initialProgression ? applyProgression({ ...DEFAULT_PLAYER_STATS }, this.initialProgression) : { ...DEFAULT_PLAYER_STATS };
     this.autoplayer.reset();
   }
@@ -278,6 +292,7 @@ export class GameScene extends Phaser.Scene {
       this.telemetry?.logEvent(this.elapsedMs, "boss-spawn", { threat, bossId, finalApex });
       this.cameras.main.shake(240, 0.004);
       playSound("upgrade");
+      this.saveCheckpoint();
     }
 
     if (this.boss) {
@@ -488,6 +503,7 @@ export class GameScene extends Phaser.Scene {
     this.spawnAt = this.elapsedMs + 1200;
     playSound("enemy-death");
     this.emitBossState();
+    this.saveCheckpoint();
   }
 
   private killEnemy(enemy: Phaser.GameObjects.Shape, data: EnemyData) {
@@ -525,6 +541,7 @@ export class GameScene extends Phaser.Scene {
     this.pausedForUpgrade = true;
     this.physics.pause();
     const options = chooseUpgradeOptions();
+    this.pendingUpgradeOptions = options;
     this.telemetry?.logEvent(this.elapsedMs, "upgrade-offered", { options: options.map((option) => option.id).join(",") });
 
     if (this.debug.autoplayer) {
@@ -533,6 +550,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     emitUpgrade(options);
+    this.saveCheckpoint();
   }
 
   private findNearestEnemy(): Phaser.GameObjects.Shape | null {
@@ -615,6 +633,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private endRun(reason: "death" | "timeout" = "death") {
+    this.runEnded = true;
+    clearCheckpoint();
     const summary: RunSummary = {
       survivalMs: Math.floor(this.elapsedMs),
       score: Math.floor(this.score),
@@ -734,6 +754,7 @@ export class GameScene extends Phaser.Scene {
 
   applyUpgrade(id: string) {
     this.pausedForUpgrade = false;
+    this.pendingUpgradeOptions = null;
     this.physics.resume();
     const result = applyUpgradeToStats(this.stats, this.health, id);
     this.stats = result.stats;
@@ -749,6 +770,181 @@ export class GameScene extends Phaser.Scene {
     });
     upgradePulse(this, this.player);
     playSound("upgrade");
+    this.saveCheckpoint();
+  }
+
+  private handleShutdown() {
+    if (!this.runEnded) this.saveCheckpoint();
+  }
+
+  private saveCheckpoint() {
+    if (this.runEnded || !this.player?.body) return;
+    this.checkpointSaveAt = this.elapsedMs + 2000;
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
+    const checkpoint: CheckpointState = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      mode: this.mode,
+      seed: this.seed,
+      elapsedMs: Math.floor(this.elapsedMs),
+      score: Math.floor(this.score),
+      kills: this.kills,
+      health: this.health,
+      invulnerableUntil: this.invulnerableUntil,
+      spawnAt: this.spawnAt,
+      shootAt: this.shootAt,
+      dashAt: this.dashAt,
+      dashUntil: this.dashUntil,
+      dashVector: { x: this.dashVector.x, y: this.dashVector.y },
+      lastManualDirection: { x: this.lastManualDirection.x, y: this.lastManualDirection.y },
+      pausedForUpgrade: this.pausedForUpgrade,
+      nextUpgradeAt: this.nextUpgradeAt,
+      nextBossAt: this.nextBossAt,
+      bossEncountersSpawned: this.bossEncountersSpawned,
+      finalApexActive: this.finalApexActive,
+      maxThreatLevel: this.maxThreatLevel,
+      activeBossStartedAt: this.activeBossStartedAt,
+      playerShotsFired: this.playerShotsFired,
+      playerShotsHit: this.playerShotsHit,
+      debug: { ...this.debug },
+      stats: { ...this.stats },
+      initialProgression: this.initialProgression ? { ...this.initialProgression, upgrades: { ...this.initialProgression.upgrades } } : null,
+      telemetryConfig: { ...this.telemetryConfig },
+      player: {
+        x: this.player.x,
+        y: this.player.y,
+        rotation: this.player.rotation,
+        visible: this.player.visible,
+        velocityX: playerBody.velocity.x,
+        velocityY: playerBody.velocity.y,
+      },
+      boss: this.boss?.toState() ?? null,
+      enemies: [],
+      enemyBullets: [],
+      playerShots: [],
+      pickups: [],
+      upgradeOptions: this.pendingUpgradeOptions ? [...this.pendingUpgradeOptions] : null,
+    };
+
+    this.enemies.children.each((child) => {
+      const enemy = child as Phaser.GameObjects.Shape;
+      if (!enemy.active) return true;
+      const data = enemy.getData("enemy") as EnemyData | undefined;
+      if (!data) return true;
+      const body = enemy.body as Phaser.Physics.Arcade.Body;
+      checkpoint.enemies.push({
+        kind: data.kind,
+        x: enemy.x,
+        y: enemy.y,
+        hp: data.hp,
+        speed: data.speed,
+        fireAt: data.fireAt,
+        casts: data.casts,
+        vx: body.velocity.x,
+        vy: body.velocity.y,
+      });
+      return true;
+    });
+    this.enemyBullets.children.each((child) => {
+      const bullet = child as Phaser.Physics.Arcade.Image;
+      if (!bullet.active) return true;
+      const body = bullet.body as Phaser.Physics.Arcade.Body;
+      checkpoint.enemyBullets.push({
+        x: bullet.x,
+        y: bullet.y,
+        vx: body.velocity.x,
+        vy: body.velocity.y,
+        lastX: (bullet.getData("lastX") as number | undefined) ?? bullet.x,
+        lastY: (bullet.getData("lastY") as number | undefined) ?? bullet.y,
+        radiusScale: Math.max(0.6, body.radius / 11),
+        angle: bullet.rotation,
+      });
+      return true;
+    });
+    this.playerShots.children.each((child) => {
+      const shot = child as Phaser.Physics.Arcade.Image;
+      if (!shot.active) return true;
+      const body = shot.body as Phaser.Physics.Arcade.Body;
+      checkpoint.playerShots.push({
+        x: shot.x,
+        y: shot.y,
+        vx: body.velocity.x,
+        vy: body.velocity.y,
+        lastX: (shot.getData("lastX") as number | undefined) ?? shot.x,
+        lastY: (shot.getData("lastY") as number | undefined) ?? shot.y,
+        damage: Number(shot.getData("damage") || 1),
+        pierce: Number(shot.getData("pierce") || 0),
+      });
+      return true;
+    });
+    this.pickups.children.each((child) => {
+      const pickup = child as Phaser.Physics.Arcade.Image;
+      if (!pickup.active) return true;
+      const body = pickup.body as Phaser.Physics.Arcade.Body;
+      checkpoint.pickups.push({
+        x: pickup.x,
+        y: pickup.y,
+        value: Number(pickup.getData("value") || 1),
+        vx: body.velocity.x,
+        vy: body.velocity.y,
+        scale: pickup.scaleX,
+      });
+      return true;
+    });
+
+    writeCheckpoint(checkpoint);
+  }
+
+  private restoreCheckpoint(checkpoint: CheckpointState) {
+    this.mode = checkpoint.mode;
+    this.seed = checkpoint.seed;
+    this.elapsedMs = checkpoint.elapsedMs;
+    this.score = checkpoint.score;
+    this.kills = checkpoint.kills;
+    this.health = checkpoint.health;
+    this.invulnerableUntil = checkpoint.invulnerableUntil;
+    this.spawnAt = checkpoint.spawnAt;
+    this.shootAt = checkpoint.shootAt;
+    this.dashAt = checkpoint.dashAt;
+    this.dashUntil = checkpoint.dashUntil;
+    this.dashVector.set(checkpoint.dashVector.x, checkpoint.dashVector.y);
+    this.lastManualDirection.set(checkpoint.lastManualDirection.x, checkpoint.lastManualDirection.y);
+    this.pausedForUpgrade = checkpoint.pausedForUpgrade;
+    this.pendingUpgradeOptions = checkpoint.upgradeOptions ? [...checkpoint.upgradeOptions] : null;
+    this.nextUpgradeAt = checkpoint.nextUpgradeAt;
+    this.nextBossAt = checkpoint.nextBossAt;
+    this.bossEncountersSpawned = checkpoint.bossEncountersSpawned;
+    this.finalApexActive = checkpoint.finalApexActive;
+    this.maxThreatLevel = checkpoint.maxThreatLevel;
+    this.activeBossStartedAt = checkpoint.activeBossStartedAt;
+    this.playerShotsFired = checkpoint.playerShotsFired;
+    this.playerShotsHit = checkpoint.playerShotsHit;
+    this.debug = mergeDebugSettings({ ...DEFAULT_DEBUG_SETTINGS }, checkpoint.debug);
+    this.stats = { ...checkpoint.stats };
+    this.initialProgression = checkpoint.initialProgression ? { ...checkpoint.initialProgression, upgrades: { ...checkpoint.initialProgression.upgrades } } : null;
+    this.telemetryConfig = { ...checkpoint.telemetryConfig };
+    this.syncTimeScale();
+    this.player.setPosition(checkpoint.player.x, checkpoint.player.y);
+    this.player.rotation = checkpoint.player.rotation;
+    this.player.setVisible(checkpoint.player.visible);
+    this.playerBody.setVelocity(checkpoint.player.velocityX, checkpoint.player.velocityY);
+    this.dashIndicator.setPosition(checkpoint.player.x, checkpoint.player.y);
+    this.enemies.clear(true, true);
+    this.enemyBullets.clear(true, true);
+    this.playerShots.clear(true, true);
+    this.pickups.clear(true, true);
+    if (checkpoint.boss) {
+      this.boss = Boss1Controller.fromState(this, checkpoint.boss);
+    }
+    for (const enemy of checkpoint.enemies) restoreEnemyFromState(this, this.enemies, enemy);
+    for (const bullet of checkpoint.enemyBullets) restoreEnemyBullet(this, this.enemyBullets, bullet);
+    for (const shot of checkpoint.playerShots) restorePlayerShot(this, this.playerShots, shot);
+    for (const pickup of checkpoint.pickups) restorePickup(this, this.pickups, pickup);
+    if (this.pausedForUpgrade && this.pendingUpgradeOptions) {
+      this.physics.pause();
+      emitUpgrade(this.pendingUpgradeOptions);
+    }
+    this.checkpointSaveAt = this.elapsedMs + 2000;
   }
 
 }
