@@ -544,7 +544,22 @@ export class GameScene extends Phaser.Scene {
     this.emitBossState();
     emitGameOver(summary);
     if (this.telemetry) {
-      this.telemetry.logEvent(this.elapsedMs, "run-end", { reason, score: summary.score, survivalMs: summary.survivalMs });
+      const autoplayer = this.autoplayer.getTelemetrySnapshot();
+      this.telemetry.logEvent(this.elapsedMs, "run-end", {
+        reason,
+        score: summary.score,
+        survivalMs: summary.survivalMs,
+        threat: this.getThreatLevel(),
+        bullets: this.enemyBullets.countActive(true),
+        enemies: this.enemies.countActive(true),
+        pickups: this.pickups.countActive(true),
+        bossActive: Boolean(this.boss),
+        bossPhase: this.boss?.phase ?? 0,
+        bossHpRatio: this.boss ? round(this.boss.hp / this.boss.maxHp) : 0,
+        danger: round(autoplayer.danger),
+        projectedDanger: round(autoplayer.projectedDanger),
+        reasonTag: autoplayer.reason,
+      });
       const run = this.telemetry.finalize({
         reason,
         survivalMs: summary.survivalMs,
@@ -561,7 +576,26 @@ export class GameScene extends Phaser.Scene {
   private applyPlayerDamage() {
     if (this.elapsedMs < this.invulnerableUntil || this.debug.invulnerable) return;
     this.health -= 1;
-    this.telemetry?.logEvent(this.elapsedMs, "damage", { health: this.health, threat: this.getThreatLevel() });
+    const autoplayer = this.autoplayer.getTelemetrySnapshot();
+    const bullets = this.enemyBullets.countActive(true);
+    const enemies = this.enemies.countActive(true);
+    const edgeDistance = round(Math.min(this.player.x, ARENA_WIDTH - this.player.x, this.player.y, ARENA_HEIGHT - this.player.y));
+    let context = "attrition";
+    if (this.boss?.overlapsPlayer(this.player.x, this.player.y, 7)) context = "boss-contact";
+    else if (bullets >= 120) context = "burst";
+    else if (edgeDistance < 90) context = "cornered";
+    this.telemetry?.logEvent(this.elapsedMs, "damage", {
+      health: this.health,
+      threat: this.getThreatLevel(),
+      bullets,
+      enemies,
+      edgeDistance,
+      bossActive: Boolean(this.boss),
+      danger: round(autoplayer.danger),
+      projectedDanger: round(autoplayer.projectedDanger),
+      reasonTag: autoplayer.reason,
+      context,
+    });
     this.invulnerableUntil = this.elapsedMs + 1200;
     this.cameras.main.shake(120, 0.006);
     playerHitBurst(this, this.player);
