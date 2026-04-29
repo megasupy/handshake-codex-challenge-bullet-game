@@ -1,3 +1,5 @@
+import { readPreferences } from "../services/preferences";
+
 type SoundName = "shoot" | "enemy-hit" | "enemy-death" | "pickup" | "player-hit" | "dash" | "upgrade";
 
 const lastPlayed = new Map<SoundName, number>();
@@ -22,13 +24,15 @@ export function playSound(name: SoundName): void {
     const context = getAudioContext();
     if (!context) return;
     const config = getSoundConfig(name);
+    const volume = config.volume * readPreferences().soundVolume;
+    if (volume <= 0) return;
     const oscillator = context.createOscillator();
     const gain = context.createGain();
 
     oscillator.type = config.type;
     oscillator.frequency.setValueAtTime(config.startFrequency, context.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(config.endFrequency, context.currentTime + config.duration);
-    gain.gain.setValueAtTime(config.volume, context.currentTime);
+    gain.gain.setValueAtTime(volume, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + config.duration);
 
     oscillator.connect(gain);

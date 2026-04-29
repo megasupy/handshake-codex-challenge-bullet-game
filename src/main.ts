@@ -7,6 +7,7 @@ import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayl
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
 import { getSavedName } from "./services/localRuns";
+import { formatPreferencesSummary, readPreferences, updatePreferences, type PreferencesState } from "./services/preferences";
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
 import type { GameMode, LeaderboardResult, RunRecord, RunSummary } from "./types";
 import type { TelemetryConfig, TelemetryRun } from "./game/telemetry";
@@ -48,6 +49,11 @@ const checkpointSummary = mustGet("checkpoint-summary");
 const progressionStats = mustGet("progression-stats");
 const progressionUpgrades = mustGet("progression-upgrades");
 const progressionReset = mustGetButton("progression-reset");
+const preferencesSummary = mustGet("preferences-summary");
+const prefsVolume = mustGetInput("prefs-volume");
+const prefsVolumeValue = mustGet("prefs-volume-value");
+const prefsScreenShake = mustGetInput("prefs-screen-shake");
+const prefsReducedMotion = mustGetInput("prefs-reduced-motion");
 const upgradeScreen = mustGet("upgrade-screen");
 const gameOver = mustGet("game-over");
 const runSummary = mustGet("run-summary");
@@ -87,11 +93,13 @@ let currentMode: GameMode = "endless";
 let lastRun: RunSummary | null = null;
 let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
+let currentPreferences: PreferencesState = readPreferences();
 
 if (automationConfig.autoplayer) localStorage.setItem(AUTOPLAYER_KEY, "true");
 playerNameInput.value = getSavedName();
 debugControls.autoplayer.checked = automationConfig.autoplayer || localStorage.getItem(AUTOPLAYER_KEY) === "true";
 if (automationConfig.timeScale !== null) debugControls.timeScale.value = automationConfig.timeScale.toString();
+applyPreferencesToUi(currentPreferences);
 
 playButton.addEventListener("click", () => startRun("endless"));
 resumeButton.addEventListener("click", () => {
@@ -109,6 +117,12 @@ progressionReset.addEventListener("click", () => {
   currentProgression = resetProgression();
   renderProgressionPanel();
 });
+prefsVolume.addEventListener("input", applyPreferenceControls);
+prefsVolume.addEventListener("change", applyPreferenceControls);
+prefsScreenShake.addEventListener("input", applyPreferenceControls);
+prefsScreenShake.addEventListener("change", applyPreferenceControls);
+prefsReducedMotion.addEventListener("input", applyPreferenceControls);
+prefsReducedMotion.addEventListener("change", applyPreferenceControls);
 mustGetButton("debug-apply-time").addEventListener("click", () => getGameScene()?.setElapsedSeconds(Number(debugControls.time.value) || 0));
 mustGetButton("debug-clear").addEventListener("click", () => getGameScene()?.clearThreats());
 mustGetButton("debug-kill").addEventListener("click", () => getGameScene()?.forceEndRun());
@@ -439,6 +453,23 @@ function renderProgressionPanel() {
     }
     progressionUpgrades.append(button);
   }
+}
+
+function applyPreferenceControls() {
+  currentPreferences = updatePreferences({
+    soundVolume: Number(prefsVolume.value),
+    screenShake: prefsScreenShake.checked,
+    reducedMotion: prefsReducedMotion.checked,
+  });
+  applyPreferencesToUi(currentPreferences);
+}
+
+function applyPreferencesToUi(state: PreferencesState) {
+  prefsVolume.value = String(state.soundVolume);
+  prefsVolumeValue.textContent = `${Math.round(state.soundVolume * 100)}%`;
+  prefsScreenShake.checked = state.screenShake;
+  prefsReducedMotion.checked = state.reducedMotion;
+  preferencesSummary.textContent = formatPreferencesSummary(state);
 }
 
 function renderRunSummary(run: RunSummary) {

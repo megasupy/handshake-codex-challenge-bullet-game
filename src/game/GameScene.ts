@@ -16,6 +16,7 @@ import { TelemetryRecorder, toAutoplayerSample, type TelemetryConfig } from "./t
 import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpgradeOptions } from "./upgrades";
 import { applyProgression, type ProgressionState } from "../services/progression";
 import { clearCheckpoint, writeCheckpoint, type CheckpointState } from "../services/checkpoint";
+import { readPreferences } from "../services/preferences";
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Rectangle;
@@ -294,7 +295,7 @@ export class GameScene extends Phaser.Scene {
       this.bossEncountersSpawned += 1;
       this.activeBossStartedAt = this.elapsedMs;
       this.telemetry?.logEvent(this.elapsedMs, "boss-spawn", { threat, bossId, finalApex });
-      this.cameras.main.shake(240, 0.004);
+      if (readPreferences().screenShake) this.cameras.main.shake(240, 0.004);
       playSound("upgrade");
       this.saveCheckpoint();
     }
@@ -472,7 +473,7 @@ export class GameScene extends Phaser.Scene {
       playSound(result.phaseChanged ? "upgrade" : "enemy-hit");
       if (result.phaseChanged) {
         this.telemetry?.logEvent(this.elapsedMs, "boss-phase", { phase: this.boss.phase });
-        this.cameras.main.shake(180, 0.003);
+        if (readPreferences().screenShake) this.cameras.main.shake(180, 0.003);
       }
       if (result.defeated) {
         this.defeatBoss();
@@ -722,7 +723,7 @@ export class GameScene extends Phaser.Scene {
       context,
     });
     this.invulnerableUntil = this.elapsedMs + 1200;
-    this.cameras.main.shake(120, 0.006);
+    if (readPreferences().screenShake) this.cameras.main.shake(120, 0.006);
     playerHitBurst(this, this.player);
     playSound("player-hit");
     if (this.health <= 0) this.endRun();
