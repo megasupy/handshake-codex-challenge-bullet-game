@@ -6,7 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
-import { getSavedName } from "./services/localRuns";
+import { getSavedName, readRuns } from "./services/localRuns";
 import { formatKeybindSummary, readKeybinds, resetKeybinds, updateKeybind, type KeybindAction, type KeybindState } from "./services/keybinds";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
@@ -56,6 +56,9 @@ const progressionUpgrades = mustGet("progression-upgrades");
 const progressionReset = mustGetButton("progression-reset");
 const recordsSummary = mustGet("records-summary");
 const recordsStats = mustGet("records-stats");
+const recentRunsCount = mustGet("recent-runs-count");
+const recentRunsSummary = mustGet("recent-runs-summary");
+const recentRunsList = mustGet("recent-runs-list");
 const preferencesSummary = mustGet("preferences-summary");
 const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
@@ -332,6 +335,7 @@ gameEvents.addEventListener("game-over", (event) => {
   submitButton.disabled = false;
   renderProgressionPanel();
   renderRecordsPanel();
+  renderRecentRunsPanel();
   show(gameOver);
   hideHud();
   hideBossHud();
@@ -377,6 +381,7 @@ gameEvents.addEventListener("automation-snapshot", (event) => {
 void refreshLeaderboard("endless");
 renderProgressionPanel();
 renderRecordsPanel();
+renderRecentRunsPanel();
 refreshCheckpointUi();
 renderTelemetryArchive();
 profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
@@ -539,6 +544,7 @@ async function submitCurrentRun() {
   submitStatus.textContent = "Submitting...";
   const result = await submitRun(lastRun, playerNameInput.value);
   renderLeaderboard(result);
+  renderRecentRunsPanel();
   submitStatus.textContent = result.error || `Submitted to ${result.source === "remote" ? "online" : "local"} leaderboard.`;
 }
 
@@ -628,6 +634,33 @@ function renderRecordsPanel() {
     stat.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
     recordsStats.append(stat);
   }
+}
+
+function renderRecentRunsPanel() {
+  const runs = readRuns();
+  recentRunsCount.textContent = `${runs.length} run${runs.length === 1 ? "" : "s"}`;
+  recentRunsSummary.textContent = runs.length > 0
+    ? "Recently submitted runs are stored locally and mirrored to the leaderboard when possible."
+    : "Recently submitted runs are stored locally on this device.";
+  recentRunsList.innerHTML = "";
+
+  if (runs.length === 0) {
+    const item = document.createElement("li");
+    item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
+    item.textContent = "No recent runs yet.";
+    recentRunsList.append(item);
+    return;
+  }
+
+  runs.slice(0, 5).forEach((run) => {
+    const item = document.createElement("li");
+    item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-300";
+    item.innerHTML = `
+      <strong class="block truncate text-white">${escapeHtml(run.playerName)}</strong>
+      <span class="mt-1 block text-xs leading-5 text-slate-400">${run.mode.toUpperCase()} · ${(run.survivalMs / 1000).toFixed(1)}s · ${run.score.toLocaleString()} pts</span>
+    `;
+    recentRunsList.append(item);
+  });
 }
 
 function applyPreferenceControls() {
@@ -755,6 +788,7 @@ function syncProfileFromStorage() {
   applyPreferencesToUi(currentPreferences);
   renderProgressionPanel();
   renderRecordsPanel();
+  renderRecentRunsPanel();
   renderTelemetryArchive();
   refreshTutorialUi();
   renderKeybindsPanel();
