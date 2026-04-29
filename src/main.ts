@@ -96,6 +96,7 @@ const bindDash = mustGetButton("bind-dash");
 const keybindsReset = mustGetButton("keybinds-reset");
 const telemetryArchiveCount = mustGet("telemetry-archive-count");
 const telemetryArchiveSummary = mustGet("telemetry-archive-summary");
+const telemetryFilter = mustGetInput("telemetry-filter");
 const telemetryArchiveList = mustGet("telemetry-archive-list");
 const telemetryArchiveCopy = mustGetButton("telemetry-archive-copy");
 const telemetryArchiveDownload = mustGetButton("telemetry-archive-download");
@@ -196,6 +197,7 @@ let currentBossHudState: BossHudPayload | null = null;
 let currentLeaderboardRows: RunRecord[] = [];
 let selectedRecentRun: RunRecord | null = null;
 let selectedBoardRun: RunRecord | null = null;
+let telemetryFilterValue = "";
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 
@@ -208,6 +210,7 @@ renderSettingsPresetPanel();
 renderFullscreenUi();
 tutorialDontShow.checked = !currentTutorial.seen;
 renderKeybindsPanel();
+telemetryFilter.value = "";
 refreshDailySeedUi();
 
 playButton.addEventListener("click", () => startRun("endless"));
@@ -381,6 +384,12 @@ telemetryArchiveDownload.addEventListener("click", downloadLatestTelemetryLog);
 telemetryArchiveClear.addEventListener("click", () => {
   clearTelemetryArchive();
   currentTelemetryArchive = [];
+  renderTelemetryArchive();
+  renderTelemetryTimeline();
+  renderRunFeed();
+});
+telemetryFilter.addEventListener("input", () => {
+  telemetryFilterValue = telemetryFilter.value.trim().toLowerCase();
   renderTelemetryArchive();
   renderTelemetryTimeline();
   renderRunFeed();
@@ -1215,21 +1224,24 @@ function showTutorial() {
 }
 
 function renderTelemetryArchive() {
-  telemetryArchiveCount.textContent = `${currentTelemetryArchive.length} log${currentTelemetryArchive.length === 1 ? "" : "s"}`;
-  telemetryArchiveSummary.textContent = currentTelemetryArchive.length > 0
-    ? formatTelemetryArchiveEntry(currentTelemetryArchive[0])
+  const entries = telemetryFilterValue
+    ? currentTelemetryArchive.filter((entry) => matchesTelemetryEntry(entry, telemetryFilterValue))
+    : currentTelemetryArchive;
+  telemetryArchiveCount.textContent = `${entries.length} log${entries.length === 1 ? "" : "s"}`;
+  telemetryArchiveSummary.textContent = entries.length > 0
+    ? formatTelemetryArchiveEntry(entries[0])
     : "The latest completed telemetry run is saved locally for review.";
   telemetryArchiveList.innerHTML = "";
 
-  if (currentTelemetryArchive.length === 0) {
+  if (entries.length === 0) {
     const item = document.createElement("li");
     item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
-    item.textContent = "No telemetry logs saved yet.";
+    item.textContent = telemetryFilterValue ? "No telemetry logs match the filter." : "No telemetry logs saved yet.";
     telemetryArchiveList.append(item);
     return;
   }
 
-  currentTelemetryArchive.slice(0, 3).forEach((entry) => {
+  entries.slice(0, 3).forEach((entry) => {
     const item = document.createElement("li");
     item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-300";
     item.innerHTML = `
@@ -1241,27 +1253,29 @@ function renderTelemetryArchive() {
 }
 
 function renderTelemetryTimeline() {
-  const entry = currentTelemetryArchive[0];
+  const entry = telemetryFilterValue
+    ? currentTelemetryArchive.find((item) => matchesTelemetryEntry(item, telemetryFilterValue))
+    : currentTelemetryArchive[0];
   if (!entry) {
     telemetryTimelineCount.textContent = "0 lines";
     telemetryTimelineSummary.textContent = "The latest telemetry run is summarized into readable snapshots.";
-    telemetryTimelineList.innerHTML = `<li class="rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400">No telemetry timeline yet.</li>`;
+    telemetryTimelineList.innerHTML = `<li class="rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400">${telemetryFilterValue ? "No telemetry timeline matches the filter." : "No telemetry timeline yet."}</li>`;
     return;
   }
 
   const lines = entry.logText
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.includes("SNAP") || line.includes("EVENT"));
+    .filter((line) => (line.includes("SNAP") || line.includes("EVENT")) && (!telemetryFilterValue || line.toLowerCase().includes(telemetryFilterValue)));
   const slice = lines.slice(-6);
   telemetryTimelineCount.textContent = `${slice.length} lines`;
-  telemetryTimelineSummary.textContent = `Latest run: ${formatTelemetryArchiveEntry(entry)}`;
+  telemetryTimelineSummary.textContent = `Latest run: ${formatTelemetryArchiveEntry(entry)}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`;
   telemetryTimelineList.innerHTML = "";
 
   if (slice.length === 0) {
     const empty = document.createElement("li");
     empty.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
-    empty.textContent = "Telemetry run has no readable snapshots yet.";
+    empty.textContent = telemetryFilterValue ? "Telemetry run has no matching snapshots." : "Telemetry run has no readable snapshots yet.";
     telemetryTimelineList.append(empty);
     return;
   }
@@ -1275,30 +1289,32 @@ function renderTelemetryTimeline() {
 }
 
 function renderRunFeed() {
-  const entry = currentTelemetryArchive[0];
+  const entry = telemetryFilterValue
+    ? currentTelemetryArchive.find((item) => matchesTelemetryEntry(item, telemetryFilterValue))
+    : currentTelemetryArchive[0];
   if (!entry) {
     runFeedCount.textContent = "0 events";
     runFeedSummary.textContent = "Major run milestones from the latest saved telemetry log.";
-    runFeedList.innerHTML = `<li class="rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400">No event feed yet.</li>`;
+    runFeedList.innerHTML = `<li class="rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400">${telemetryFilterValue ? "No event feed matches the filter." : "No event feed yet."}</li>`;
     return;
   }
 
   const events = entry.logText
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.includes("EVENT"))
+    .filter((line) => line.includes("EVENT") && (!telemetryFilterValue || line.toLowerCase().includes(telemetryFilterValue)))
     .map((line) => formatTelemetryEventLine(line))
     .filter((line): line is string => Boolean(line));
 
   const slice = events.slice(-8);
   runFeedCount.textContent = `${slice.length} event${slice.length === 1 ? "" : "s"}`;
-  runFeedSummary.textContent = `Latest run: ${formatTelemetryArchiveEntry(entry)}`;
+  runFeedSummary.textContent = `Latest run: ${formatTelemetryArchiveEntry(entry)}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`;
   runFeedList.innerHTML = "";
 
   if (slice.length === 0) {
     const empty = document.createElement("li");
     empty.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
-    empty.textContent = "No readable events yet.";
+    empty.textContent = telemetryFilterValue ? "No readable events match the filter." : "No readable events yet.";
     runFeedList.append(empty);
     return;
   }
@@ -1309,6 +1325,15 @@ function renderRunFeed() {
     item.textContent = event;
     runFeedList.append(item);
   }
+}
+
+function matchesTelemetryEntry(entry: TelemetryArchiveEntry, filter: string): boolean {
+  if (!filter) return true;
+  return entry.runId.toLowerCase().includes(filter)
+    || entry.seed.toLowerCase().includes(filter)
+    || entry.mode.toLowerCase().includes(filter)
+    || entry.logText.toLowerCase().includes(filter)
+    || Object.entries(entry.summary || {}).some(([key, value]) => `${key} ${value}`.toLowerCase().includes(filter));
 }
 
 function formatTelemetryEventLine(line: string): string | null {
