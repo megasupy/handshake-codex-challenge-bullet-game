@@ -231,12 +231,9 @@ export class GameScene extends Phaser.Scene {
 
   private createInput() {
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = this.input.keyboard!.addKeys("W,A,S,D,SPACE,SHIFT,ESC") as Record<string, Phaser.Input.Keyboard.Key>;
-    this.input.keyboard!.on("keydown-SPACE", () => {
-      this.dashQueued = true;
-    });
+    this.wasd = this.input.keyboard!.addKeys("W,A,S,D,SHIFT,ESC") as Record<string, Phaser.Input.Keyboard.Key>;
     this.input.keyboard!.on("keydown-SHIFT", () => {
-      this.dashQueued = true;
+      if (this.elapsedMs >= this.dashAt) this.dashQueued = true;
     });
   }
 
