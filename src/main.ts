@@ -131,6 +131,7 @@ const pauseResume = mustGetButton("pause-resume");
 const pauseRestart = mustGetButton("pause-restart");
 const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
+const runStyle = mustGet("run-style");
 const runComparison = mustGet("run-comparison");
 const runSeed = mustGet("run-seed");
 const leaderboardList = mustGet("leaderboard-list");
@@ -587,6 +588,7 @@ gameEvents.addEventListener("game-over", (event) => {
   text("final-threat", `Threat ${lastRun.maxThreatLevel}`);
   text("run-seed", lastRun.seed);
   renderRunSummary(lastRun);
+  renderRunStyle(lastRun);
   renderRunComparison(lastRun, previousRecords);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
@@ -1242,6 +1244,11 @@ function renderRunSummary(run: RunSummary) {
   }
 }
 
+function renderRunStyle(run: RunSummary) {
+  const style = describeRunStyle(run);
+  runStyle.textContent = `${style.title} · ${style.note}`;
+}
+
 function renderRunComparison(run: RunSummary, previous: RecordsState) {
   runComparison.innerHTML = "";
   const rows: Array<[string, string | number]> = [
@@ -1605,6 +1612,7 @@ function buildRunLink(run: Pick<RunRecord, "mode" | "seed">) {
 }
 
 function buildRunReport(run: RunSummary): string {
+  const style = describeRunStyle(run);
   const lines = [
     `mode: ${run.mode}`,
     `seed: ${run.seed}`,
@@ -1616,9 +1624,51 @@ function buildRunReport(run: RunSummary): string {
     `accuracy: ${((run.shotAccuracy ?? 0) * 100).toFixed(0)}%`,
     `upgrades: ${run.upgradesTaken ?? 0}`,
     `bosses: ${run.bossesDefeated ?? 0}`,
+    `buildStyle: ${style.title}`,
+    `buildNote: ${style.note}`,
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
   ];
   return lines.join("\n");
+}
+
+function describeRunStyle(run: RunSummary): { title: string; note: string } {
+  const damage = run.playerDamage ?? 1;
+  const projectiles = run.playerProjectiles ?? 1;
+  const fireRate = run.playerFireRate ?? 0;
+  const pierce = run.playerPierce ?? 0;
+  const projectileSpeed = run.playerProjectileSpeed ?? 0;
+  const speed = run.speed ?? 0;
+  const maxHealth = run.maxHealth ?? 0;
+
+  if (projectiles >= 5 || damage >= 4) {
+    return {
+      title: "Glass Cannon",
+      note: "High output and aggressive scaling. Better at clearing waves than soaking pressure.",
+    };
+  }
+  if (maxHealth >= 6 || speed <= 1.1) {
+    return {
+      title: "Anchor Build",
+      note: "Safer and sturdier, with more room to survive bad space control.",
+    };
+  }
+  if (speed >= 2.5 && projectileSpeed <= 700) {
+    return {
+      title: "Skirmisher",
+      note: "Relies on movement and spacing more than raw damage.",
+    };
+  }
+  if (pierce >= 3 || projectileSpeed >= 900 || fireRate <= 150) {
+    return {
+      title: "Precision Build",
+      note: "Covers lanes cleanly and rewards tighter positioning.",
+    };
+  }
+
+  return {
+    title: "Balanced Build",
+    note: "Evenly distributed stats and steady survival pressure.",
+  };
 }
 
 function getFilteredTelemetryEntries(): TelemetryArchiveEntry[] {
