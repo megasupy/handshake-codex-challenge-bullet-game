@@ -63,6 +63,8 @@ const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
 const submitButton = mustGetButton("submit-button");
+const replayButton = mustGetButton("replay-button");
+const copyLinkButton = mustGetButton("copy-link-button");
 const restartButton = mustGetButton("restart-button");
 const menuButton = mustGetButton("menu-button");
 const playerNameInput = mustGetInput("player-name");
@@ -108,6 +110,20 @@ resumeButton.addEventListener("click", () => {
   startRun(checkpoint.mode, checkpoint);
 });
 dailyButton.addEventListener("click", () => startRun("daily"));
+replayButton.addEventListener("click", () => {
+  if (!lastRun) return;
+  startRun(lastRun.mode, null, lastRun.seed);
+});
+copyLinkButton.addEventListener("click", async () => {
+  if (!lastRun) return;
+  const link = buildReplayLink(lastRun);
+  try {
+    await navigator.clipboard.writeText(link);
+    submitStatus.textContent = "Replay link copied.";
+  } catch {
+    submitStatus.textContent = link;
+  }
+});
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
 submitButton.addEventListener("click", submitCurrentRun);
@@ -245,7 +261,7 @@ if (automationConfig.active) {
   queueMicrotask(() => startRun("endless"));
 }
 
-function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> = null) {
+function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> = null, seedOverride?: string) {
   if (!automationConfig.active) void unlockAudio();
   if (!checkpoint) clearCheckpoint();
   currentMode = mode;
@@ -259,7 +275,7 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
   hideBossHud();
   game.scene.start("game", {
     mode,
-    seed: checkpoint?.seed || automationConfig.seed || (mode === "daily" ? dailySeed() : Date.now().toString(36)),
+    seed: checkpoint?.seed || seedOverride || automationConfig.seed || (mode === "daily" ? dailySeed() : Date.now().toString(36)),
     debugSettings: checkpoint?.debug || getDebugSettingsFromControls(),
     startMs: automationConfig.startMs,
     telemetryConfig: checkpoint?.telemetryConfig || getTelemetryConfig(),
@@ -495,6 +511,15 @@ function renderRunSummary(run: RunSummary) {
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
     runSummary.append(item);
   }
+}
+
+function buildReplayLink(run: RunSummary) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("autorun", "1");
+  url.searchParams.set("mode", run.mode);
+  url.searchParams.set("seed", run.seed);
+  url.searchParams.set("maxMs", "300000");
+  return url.toString();
 }
 
 function refreshCheckpointUi() {
