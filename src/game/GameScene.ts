@@ -306,7 +306,7 @@ export class GameScene extends Phaser.Scene {
 
   private getAutoplayerDirection() {
     const speed = this.elapsedMs < this.dashUntil ? 760 : this.stats.speed;
-    return this.autoplayer.chooseDirection({
+    const target = this.autoplayer.chooseTargetPosition({
       elapsedMs: this.elapsedMs,
       player: this.player,
       enemies: this.enemies,
@@ -314,6 +314,11 @@ export class GameScene extends Phaser.Scene {
       pickups: this.pickups,
       speed,
     });
+    const dx = target.x - this.player.x;
+    const dy = target.y - this.player.y;
+    const distanceSq = dx * dx + dy * dy;
+    if (distanceSq < 16) return Phaser.Math.Vector2.ZERO.clone();
+    return new Phaser.Math.Vector2(dx, dy).normalize();
   }
 
   private shouldDash(direction: Phaser.Math.Vector2) {

@@ -12,6 +12,7 @@ import type { AutoplayerTelemetry, EnemyData } from "./gameTypes";
 
 export class Autoplayer {
   private direction = new Phaser.Math.Vector2(0, 0);
+  private targetPosition = new Phaser.Math.Vector2(ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
   private pickupTarget: Phaser.Physics.Arcade.Image | null = null;
   private nextDecisionAt = 0;
   private bulletSampleOffset = 0;
@@ -31,6 +32,7 @@ export class Autoplayer {
 
   reset(): void {
     this.direction.set(0, 0);
+    this.targetPosition.set(ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
     this.pickupTarget = null;
     this.nextDecisionAt = 0;
     this.bulletSampleOffset = 0;
@@ -49,7 +51,7 @@ export class Autoplayer {
     };
   }
 
-  chooseDirection(args: {
+  chooseTargetPosition(args: {
     elapsedMs: number;
     player: Phaser.GameObjects.Shape;
     enemies: Phaser.Physics.Arcade.Group;
@@ -57,7 +59,7 @@ export class Autoplayer {
     pickups: Phaser.Physics.Arcade.Group;
     speed: number;
   }): Phaser.Math.Vector2 {
-    if (args.elapsedMs < this.nextDecisionAt) return this.direction.clone();
+    if (args.elapsedMs < this.nextDecisionAt) return this.targetPosition.clone();
 
     const startedAt = performance.now();
     this.bulletSampleOffset += 1;
@@ -84,9 +86,10 @@ export class Autoplayer {
       !prioritizeSurvival
     ) {
       this.direction.copy(directPickupDirection);
+      this.targetPosition.set(args.player.x + this.direction.x * args.speed * 0.3, args.player.y + this.direction.y * args.speed * 0.3);
       this.finishDecision("pickup-direct", currentDanger, currentDanger, nearestPickupDistance, nearestEnemyDistance, pickupTarget, startedAt);
       this.nextDecisionAt = args.elapsedMs + AUTOPLAYER_DECISION_INTERVAL_MS;
-      return this.direction.clone();
+      return this.targetPosition.clone();
     }
     let bestDirection = AUTOPLAYER_DIRECTIONS[0];
     let bestScore = Number.POSITIVE_INFINITY;
@@ -133,17 +136,19 @@ export class Autoplayer {
     if (edgeDistance < 130 && currentDanger < 9 && nearestPickupDistance > 170) {
       const centerDirection = new Phaser.Math.Vector2(ARENA_WIDTH / 2 - args.player.x, ARENA_HEIGHT / 2 - args.player.y).normalize();
       this.direction.copy(centerDirection);
+      this.targetPosition.set(ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
       this.finishDecision("edge-reset", currentDanger, currentDanger, nearestPickupDistance, nearestEnemyDistance, pickupTarget, startedAt);
       this.nextDecisionAt = args.elapsedMs + AUTOPLAYER_DECISION_INTERVAL_MS;
-      return this.direction.clone();
+      return this.targetPosition.clone();
     }
     const projectedHorizon = 0.28;
     const projectedX = Phaser.Math.Clamp(args.player.x + this.direction.x * args.speed * projectedHorizon, 22, ARENA_WIDTH - 22);
     const projectedY = Phaser.Math.Clamp(args.player.y + this.direction.y * args.speed * projectedHorizon, 22, ARENA_HEIGHT - 22);
+    this.targetPosition.set(projectedX, projectedY);
     const projectedDanger = this.getHazardScoreAt(projectedX, projectedY, args.enemies, args.enemyBullets, args.player);
     this.finishDecision(activePickupTarget ? "scored-pickup" : "scored-survival", currentDanger, projectedDanger, nearestPickupDistance, nearestEnemyDistance, pickupTarget, startedAt);
     this.nextDecisionAt = args.elapsedMs + AUTOPLAYER_DECISION_INTERVAL_MS;
-    return this.direction.clone();
+    return this.targetPosition.clone();
   }
 
   getTelemetrySnapshot(): AutoplayerTelemetry {
