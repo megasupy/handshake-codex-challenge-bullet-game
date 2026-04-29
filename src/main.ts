@@ -61,6 +61,11 @@ const recordsStats = mustGet("records-stats");
 const recentRunsCount = mustGet("recent-runs-count");
 const recentRunsSummary = mustGet("recent-runs-summary");
 const recentRunsList = mustGet("recent-runs-list");
+const selectedRunSync = mustGet("selected-run-sync");
+const selectedRunSummary = mustGet("selected-run-summary");
+const selectedRunReplay = mustGetButton("selected-run-replay");
+const selectedRunCopySeed = mustGetButton("selected-run-copy-seed");
+const selectedRunCopyLink = mustGetButton("selected-run-copy-link");
 const achievementsCount = mustGet("achievements-count");
 const achievementsSummary = mustGet("achievements-summary");
 const achievementsList = mustGet("achievements-list");
@@ -179,6 +184,7 @@ let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
 let currentTutorial: TutorialState = readTutorialState();
 let currentHudState: HudPayload | null = null;
 let currentBossHudState: BossHudPayload | null = null;
+let selectedRecentRun: RunRecord | null = null;
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 
@@ -236,6 +242,39 @@ copyLinkButton.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(link);
     submitStatus.textContent = "Replay link copied.";
+  } catch {
+    submitStatus.textContent = link;
+  }
+});
+recentRunsList.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const item = target.closest("[data-run-id]") as HTMLElement | null;
+  if (!item) return;
+  const run = readRuns().find((entry) => entry.id === item.dataset.runId);
+  if (!run) return;
+  selectedRecentRun = run;
+  renderSelectedRunPanel();
+  renderRecentRunsPanel();
+});
+selectedRunReplay.addEventListener("click", () => {
+  if (!selectedRecentRun) return;
+  startRun(selectedRecentRun.mode, null, selectedRecentRun.seed);
+});
+selectedRunCopySeed.addEventListener("click", async () => {
+  if (!selectedRecentRun) return;
+  try {
+    await navigator.clipboard.writeText(selectedRecentRun.seed);
+    submitStatus.textContent = "Selected seed copied.";
+  } catch {
+    submitStatus.textContent = selectedRecentRun.seed;
+  }
+});
+selectedRunCopyLink.addEventListener("click", async () => {
+  if (!selectedRecentRun) return;
+  const link = buildRunLink(selectedRecentRun);
+  try {
+    await navigator.clipboard.writeText(link);
+    submitStatus.textContent = "Selected run link copied.";
   } catch {
     submitStatus.textContent = link;
   }
@@ -744,6 +783,37 @@ function renderRecordsPanel() {
   }
 }
 
+function renderSelectedRunPanel() {
+  const run = selectedRecentRun;
+  selectedRunSync.textContent = run?.synced ? "Synced" : run ? "Local" : "None";
+  selectedRunSummary.innerHTML = "";
+
+  const rows: Record<string, string | number> = run
+    ? {
+        mode: run.mode.toUpperCase(),
+        time: `${(run.survivalMs / 1000).toFixed(1)}s`,
+        score: run.score.toLocaleString(),
+        kills: run.kills,
+        threat: run.maxThreatLevel,
+        seed: run.seed,
+      }
+    : {
+        mode: "None",
+        time: "-",
+        score: "-",
+        kills: "-",
+        threat: "-",
+        seed: "-",
+      };
+
+  for (const [label, value] of Object.entries(rows)) {
+    const item = document.createElement("div");
+    item.className = "debug-stat";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    selectedRunSummary.append(item);
+  }
+}
+
 function renderRecentRunsPanel() {
   const runs = readRuns();
   recentRunsCount.textContent = `${runs.length} run${runs.length === 1 ? "" : "s"}`;
@@ -757,18 +827,29 @@ function renderRecentRunsPanel() {
     item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
     item.textContent = "No recent runs yet.";
     recentRunsList.append(item);
+    selectedRecentRun = null;
+    renderSelectedRunPanel();
     return;
   }
 
   runs.slice(0, 5).forEach((run) => {
     const item = document.createElement("li");
-    item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-300";
+    const selected = selectedRecentRun?.id === run.id;
+    item.className = selected
+      ? "rounded-md border border-pulse bg-slate-900/90 px-3 py-3 text-sm text-slate-100"
+      : "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-300";
+    item.dataset.runId = run.id;
     item.innerHTML = `
       <strong class="block truncate text-white">${escapeHtml(run.playerName)}</strong>
       <span class="mt-1 block text-xs leading-5 text-slate-400">${run.mode.toUpperCase()} · ${(run.survivalMs / 1000).toFixed(1)}s · ${run.score.toLocaleString()} pts</span>
     `;
     recentRunsList.append(item);
   });
+
+  if (!selectedRecentRun || !runs.some((run) => run.id === selectedRecentRun?.id)) {
+    selectedRecentRun = runs[0] || null;
+  }
+  renderSelectedRunPanel();
 }
 
 function renderAchievementsPanel() {
@@ -1265,13 +1346,17 @@ function downloadLatestTelemetryLog() {
   URL.revokeObjectURL(url);
 }
 
-function buildReplayLink(run: RunSummary) {
+function buildReplayLink(run: Pick<RunSummary, "mode" | "seed">) {
   const url = new URL(window.location.href);
   url.searchParams.set("autorun", "1");
   url.searchParams.set("mode", run.mode);
   url.searchParams.set("seed", run.seed);
   url.searchParams.set("maxMs", "300000");
   return url.toString();
+}
+
+function buildRunLink(run: Pick<RunRecord, "mode" | "seed">) {
+  return buildReplayLink(run);
 }
 
 function refreshCheckpointUi() {

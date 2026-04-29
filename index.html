@@ -84,6 +84,18 @@
             </div>
             <p id="recent-runs-summary" class="mt-3 text-sm leading-6 text-slate-300">Recently submitted runs are stored locally on this device.</p>
             <ol id="recent-runs-list" class="mt-4 space-y-2"></ol>
+            <div class="mt-4 rounded-md border border-line bg-slate-950/60 p-4">
+              <div class="flex items-center justify-between gap-3">
+                <strong class="text-sm font-black text-white">Selected Run</strong>
+                <span id="selected-run-sync" class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">None</span>
+              </div>
+              <div id="selected-run-summary" class="mt-3 grid grid-cols-2 gap-2 text-xs"></div>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <button id="selected-run-replay" class="btn-secondary px-3 py-2">Replay</button>
+                <button id="selected-run-copy-seed" class="btn-secondary px-3 py-2">Copy Seed</button>
+                <button id="selected-run-copy-link" class="btn-secondary px-3 py-2">Copy Link</button>
+              </div>
+            </div>
           </aside>
           <aside class="panel w-full max-w-md">
             <div class="flex items-center justify-between gap-4">
