@@ -166,6 +166,7 @@ const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
 const leaderboardModeEndless = mustGetButton("leaderboard-mode-endless");
 const leaderboardModeDaily = mustGetButton("leaderboard-mode-daily");
+const leaderboardModeCampaign = mustGetButton("leaderboard-mode-campaign");
 const leaderboardRefresh = mustGetButton("leaderboard-refresh");
 const leaderboardExport = mustGetButton("leaderboard-export");
 const selectedBoardSync = mustGet("selected-board-sync");
@@ -444,6 +445,12 @@ leaderboardModeEndless.addEventListener("click", () => {
 });
 leaderboardModeDaily.addEventListener("click", () => {
   leaderboardMode = "daily";
+  writeLeaderboardMode(leaderboardMode);
+  renderLeaderboardModeButtons();
+  void refreshLeaderboard(leaderboardMode);
+});
+leaderboardModeCampaign.addEventListener("click", () => {
+  leaderboardMode = "campaign";
   writeLeaderboardMode(leaderboardMode);
   renderLeaderboardModeButtons();
   void refreshLeaderboard(leaderboardMode);
@@ -1024,6 +1031,7 @@ async function refreshLeaderboard(mode: GameMode) {
 function renderLeaderboardModeButtons() {
   leaderboardModeEndless.className = leaderboardMode === "endless" ? "btn-primary px-3 py-2" : "btn-secondary px-3 py-2";
   leaderboardModeDaily.className = leaderboardMode === "daily" ? "btn-primary px-3 py-2" : "btn-secondary px-3 py-2";
+  leaderboardModeCampaign.className = leaderboardMode === "campaign" ? "btn-primary px-3 py-2" : "btn-secondary px-3 py-2";
 }
 
 function renderLeaderboard(result: LeaderboardResult) {
@@ -2491,7 +2499,7 @@ function writeStoredText(key: string, value: string): void {
 function readLeaderboardMode(): GameMode {
   try {
     const raw = localStorage.getItem(LEADERBOARD_MODE_KEY);
-    return raw === "daily" ? "daily" : "endless";
+    return raw === "daily" || raw === "campaign" ? raw : "endless";
   } catch {
     return "endless";
   }
