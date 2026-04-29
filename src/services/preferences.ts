@@ -4,6 +4,7 @@ export type PreferencesState = {
   version: 1;
   soundVolume: number;
   screenShake: boolean;
+  screenShakeStrength: number;
   reducedMotion: boolean;
 };
 
@@ -12,6 +13,7 @@ function defaultPreferences(): PreferencesState {
     version: 1,
     soundVolume: 1,
     screenShake: true,
+    screenShakeStrength: 1,
     reducedMotion: false,
   };
 }
@@ -45,6 +47,7 @@ export function formatPreferencesSummary(state: PreferencesState): string {
   const parts = [
     `Sound ${Math.round(state.soundVolume * 100)}%`,
     state.screenShake ? "Shake on" : "Shake off",
+    state.screenShake ? `Strength ${state.screenShakeStrength.toFixed(1)}x` : "No shake",
     state.reducedMotion ? "Reduced motion" : "Full motion",
   ];
   return parts.join(" · ");
@@ -56,10 +59,16 @@ function normalizePreferences(input: Partial<PreferencesState>): PreferencesStat
     version: 1,
     soundVolume: clamp01(input.soundVolume ?? base.soundVolume),
     screenShake: input.screenShake ?? base.screenShake,
+    screenShakeStrength: clampRange(input.screenShakeStrength ?? base.screenShakeStrength, 0.25, 2),
     reducedMotion: input.reducedMotion ?? base.reducedMotion,
   };
 }
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 1));
+}
+
+function clampRange(value: number, min: number, max: number): number {
+  const normalized = Number.isFinite(value) ? value : 1;
+  return Math.max(min, Math.min(max, normalized));
 }

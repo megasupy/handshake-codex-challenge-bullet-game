@@ -74,6 +74,8 @@ const settingsPresetList = mustGet("settings-preset-list");
 const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
 const prefsScreenShake = mustGetInput("prefs-screen-shake");
+const prefsScreenShakeStrength = mustGetInput("prefs-screen-shake-strength");
+const prefsScreenShakeStrengthValue = mustGet("prefs-screen-shake-strength-value");
 const prefsReducedMotion = mustGetInput("prefs-reduced-motion");
 const fullscreenSummary = mustGet("fullscreen-summary");
 const fullscreenToggle = mustGetButton("fullscreen-toggle");
@@ -223,6 +225,8 @@ prefsVolume.addEventListener("input", applyPreferenceControls);
 prefsVolume.addEventListener("change", applyPreferenceControls);
 prefsScreenShake.addEventListener("input", applyPreferenceControls);
 prefsScreenShake.addEventListener("change", applyPreferenceControls);
+prefsScreenShakeStrength.addEventListener("input", applyPreferenceControls);
+prefsScreenShakeStrength.addEventListener("change", applyPreferenceControls);
 prefsReducedMotion.addEventListener("input", applyPreferenceControls);
 prefsReducedMotion.addEventListener("change", applyPreferenceControls);
 fullscreenToggle.addEventListener("click", () => void toggleFullscreen());
@@ -754,6 +758,7 @@ function applyPreferenceControls() {
   currentPreferences = updatePreferences({
     soundVolume: Number(prefsVolume.value),
     screenShake: prefsScreenShake.checked,
+    screenShakeStrength: Number(prefsScreenShakeStrength.value),
     reducedMotion: prefsReducedMotion.checked,
   });
   currentSettingsPreset = "custom";
@@ -766,6 +771,8 @@ function applyPreferencesToUi(state: PreferencesState) {
   prefsVolume.value = String(state.soundVolume);
   prefsVolumeValue.textContent = `${Math.round(state.soundVolume * 100)}%`;
   prefsScreenShake.checked = state.screenShake;
+  prefsScreenShakeStrength.value = String(state.screenShakeStrength);
+  prefsScreenShakeStrengthValue.textContent = `${state.screenShakeStrength.toFixed(1)}x`;
   prefsReducedMotion.checked = state.reducedMotion;
   preferencesSummary.textContent = formatPreferencesSummary(state);
 }

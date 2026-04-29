@@ -16,25 +16,25 @@ export const SETTINGS_PRESETS: SettingsPreset[] = [
     id: "balanced",
     title: "Balanced",
     description: "Comfortable defaults for normal play.",
-    settings: { soundVolume: 1, screenShake: true, reducedMotion: false },
+    settings: { soundVolume: 1, screenShake: true, screenShakeStrength: 1, reducedMotion: false },
   },
   {
     id: "focus",
     title: "Focus",
     description: "Lower noise and reduced motion.",
-    settings: { soundVolume: 0.7, screenShake: false, reducedMotion: true },
+    settings: { soundVolume: 0.7, screenShake: false, screenShakeStrength: 0.5, reducedMotion: true },
   },
   {
     id: "silent",
     title: "Silent",
     description: "Muted with minimal motion.",
-    settings: { soundVolume: 0, screenShake: false, reducedMotion: true },
+    settings: { soundVolume: 0, screenShake: false, screenShakeStrength: 0.25, reducedMotion: true },
   },
   {
     id: "full-juice",
     title: "Full Juice",
     description: "Loud and energetic presentation.",
-    settings: { soundVolume: 1, screenShake: true, reducedMotion: false },
+    settings: { soundVolume: 1, screenShake: true, screenShakeStrength: 1.5, reducedMotion: false },
   },
 ];
 
