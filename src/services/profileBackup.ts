@@ -6,6 +6,7 @@ import { readPreferences, writePreferences, type PreferencesState } from "./pref
 import { readProgression, writeProgression, type ProgressionState } from "./progression";
 import { readTelemetryArchive, replaceTelemetryArchive, type TelemetryArchiveEntry } from "./telemetryArchive";
 import { markTutorialSeen, readTutorialState, type TutorialState } from "./tutorial";
+import { readKeybinds, resetKeybinds, type KeybindState, writeKeybinds } from "./keybinds";
 
 const BACKUP_VERSION = 1;
 
@@ -16,6 +17,7 @@ export type ProfileBackup = {
   progression: ProgressionState;
   preferences: PreferencesState;
   tutorial: TutorialState;
+  keybinds: KeybindState;
   runs: RunRecord[];
   telemetryArchive: TelemetryArchiveEntry[];
   checkpoint: CheckpointState | null;
@@ -29,6 +31,7 @@ export function exportProfileBackup(): ProfileBackup {
     progression: readProgression(),
     preferences: readPreferences(),
     tutorial: readTutorialState(),
+    keybinds: readKeybinds(),
     runs: readRuns(),
     telemetryArchive: readTelemetryArchive(),
     checkpoint: readCheckpointSafe(),
@@ -46,6 +49,8 @@ export function importProfileBackup(raw: string): { ok: boolean; error?: string 
     if (parsed.progression) writeProgression(parsed.progression);
     if (parsed.preferences) writePreferences(parsed.preferences);
     if (parsed.tutorial) markTutorialSeen(parsed.tutorial.seen);
+    if (parsed.keybinds) writeKeybinds(parsed.keybinds);
+    else resetKeybinds();
     if (Array.isArray(parsed.runs)) writeRuns(parsed.runs);
     if (Array.isArray(parsed.telemetryArchive)) replaceTelemetryArchive(parsed.telemetryArchive);
     if (parsed.checkpoint === null) clearCheckpoint();

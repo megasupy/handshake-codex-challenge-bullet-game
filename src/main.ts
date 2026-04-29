@@ -7,6 +7,7 @@ import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayl
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
 import { getSavedName } from "./services/localRuns";
+import { formatKeybindSummary, readKeybinds, resetKeybinds, updateKeybind, type KeybindAction, type KeybindState } from "./services/keybinds";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
 import { clearTelemetryArchive, formatTelemetryArchiveEntry, readTelemetryArchive, saveTelemetryRun, type TelemetryArchiveEntry } from "./services/telemetryArchive";
@@ -57,6 +58,13 @@ const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
 const prefsScreenShake = mustGetInput("prefs-screen-shake");
 const prefsReducedMotion = mustGetInput("prefs-reduced-motion");
+const keybindsSummary = mustGet("keybinds-summary");
+const bindUp = mustGetButton("bind-up");
+const bindDown = mustGetButton("bind-down");
+const bindLeft = mustGetButton("bind-left");
+const bindRight = mustGetButton("bind-right");
+const bindDash = mustGetButton("bind-dash");
+const keybindsReset = mustGetButton("keybinds-reset");
 const telemetryArchiveCount = mustGet("telemetry-archive-count");
 const telemetryArchiveSummary = mustGet("telemetry-archive-summary");
 const telemetryArchiveList = mustGet("telemetry-archive-list");
@@ -115,8 +123,10 @@ let lastRun: RunSummary | null = null;
 let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
 let currentPreferences: PreferencesState = readPreferences();
+let currentKeybinds: KeybindState = readKeybinds();
 let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
 let currentTutorial: TutorialState = readTutorialState();
+let pendingKeybindAction: KeybindAction | null = null;
 
 if (automationConfig.autoplayer) localStorage.setItem(AUTOPLAYER_KEY, "true");
 playerNameInput.value = getSavedName();
@@ -124,6 +134,7 @@ debugControls.autoplayer.checked = automationConfig.autoplayer || localStorage.g
 if (automationConfig.timeScale !== null) debugControls.timeScale.value = automationConfig.timeScale.toString();
 applyPreferencesToUi(currentPreferences);
 tutorialDontShow.checked = !currentTutorial.seen;
+renderKeybindsPanel();
 
 playButton.addEventListener("click", () => startRun("endless"));
 resumeButton.addEventListener("click", () => {
@@ -133,6 +144,17 @@ resumeButton.addEventListener("click", () => {
 });
 dailyButton.addEventListener("click", () => startRun("daily"));
 tutorialButton.addEventListener("click", () => showTutorial());
+bindUp.addEventListener("click", () => beginKeybindCapture("moveUp"));
+bindDown.addEventListener("click", () => beginKeybindCapture("moveDown"));
+bindLeft.addEventListener("click", () => beginKeybindCapture("moveLeft"));
+bindRight.addEventListener("click", () => beginKeybindCapture("moveRight"));
+bindDash.addEventListener("click", () => beginKeybindCapture("dash"));
+keybindsReset.addEventListener("click", () => {
+  currentKeybinds = resetKeybinds();
+  pendingKeybindAction = null;
+  renderKeybindsPanel();
+  profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
+});
 replayButton.addEventListener("click", () => {
   if (!lastRun) return;
   startRun(lastRun.mode, null, lastRun.seed);
@@ -211,6 +233,15 @@ mustGetButton("debug-test-sound").addEventListener("click", async () => {
 window.addEventListener("online", () => void syncPendingRuns());
 window.addEventListener("pointerdown", () => void unlockAudio(), { once: true });
 window.addEventListener("keydown", () => void unlockAudio(), { once: true });
+window.addEventListener("keydown", (event) => {
+  if (!pendingKeybindAction) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  currentKeybinds = updateKeybind(pendingKeybindAction, event.key);
+  pendingKeybindAction = null;
+  renderKeybindsPanel();
+  profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
+});
 window.addEventListener("keydown", (event) => {
   if (event.key === "`") {
     event.preventDefault();
@@ -351,6 +382,7 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
     telemetryConfig: checkpoint?.telemetryConfig || getTelemetryConfig(),
     progression: currentProgression,
     checkpoint,
+    keybinds: currentKeybinds,
   });
   if (!checkpoint) applyDebugControls();
 }
@@ -560,6 +592,22 @@ function applyPreferencesToUi(state: PreferencesState) {
   preferencesSummary.textContent = formatPreferencesSummary(state);
 }
 
+function beginKeybindCapture(action: KeybindAction) {
+  pendingKeybindAction = action;
+  keybindsSummary.textContent = `Press a key for ${action}.`;
+}
+
+function renderKeybindsPanel() {
+  bindUp.textContent = `Up: ${currentKeybinds.moveUp}`;
+  bindDown.textContent = `Down: ${currentKeybinds.moveDown}`;
+  bindLeft.textContent = `Left: ${currentKeybinds.moveLeft}`;
+  bindRight.textContent = `Right: ${currentKeybinds.moveRight}`;
+  bindDash.textContent = `Dash: ${currentKeybinds.dash}`;
+  keybindsSummary.textContent = pendingKeybindAction
+    ? `Press a key for ${pendingKeybindAction}.`
+    : formatKeybindSummary(currentKeybinds);
+}
+
 function renderRunSummary(run: RunSummary) {
   runSummary.innerHTML = "";
   const rows: Record<string, string | number> = {
@@ -620,6 +668,7 @@ function renderTelemetryArchive() {
 function syncProfileFromStorage() {
   currentProgression = readProgression();
   currentPreferences = readPreferences();
+  currentKeybinds = readKeybinds();
   currentTutorial = readTutorialState();
   currentTelemetryArchive = readTelemetryArchive();
   playerNameInput.value = getSavedName();
@@ -627,6 +676,8 @@ function syncProfileFromStorage() {
   renderProgressionPanel();
   renderTelemetryArchive();
   refreshTutorialUi();
+  renderKeybindsPanel();
+  profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
 }
 
 function refreshTutorialUi() {

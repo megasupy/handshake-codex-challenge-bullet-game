@@ -17,13 +17,13 @@ import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpg
 import { applyProgression, type ProgressionState } from "../services/progression";
 import { clearCheckpoint, writeCheckpoint, type CheckpointState } from "../services/checkpoint";
 import { readPreferences } from "../services/preferences";
+import { DEFAULT_KEYBINDS, normalizeKeyName, type KeybindState } from "../services/keybinds";
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Rectangle;
   private dashIndicator!: Phaser.GameObjects.Rectangle;
   private playerBody!: Phaser.Physics.Arcade.Body;
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
+  private inputKeys!: Record<string, Phaser.Input.Keyboard.Key>;
   private dashQueued = false;
   private enemies!: Phaser.Physics.Arcade.Group;
   private playerShots!: Phaser.Physics.Arcade.Group;
@@ -61,6 +61,7 @@ export class GameScene extends Phaser.Scene {
   private initialElapsedMs = 0;
   private initialProgression: ProgressionState | null = null;
   private resumeCheckpoint: CheckpointState | null = null;
+  private keybinds: KeybindState = { ...DEFAULT_KEYBINDS };
   private playerShotsFired = 0;
   private playerShotsHit = 0;
   private upgradesTaken = 0;
@@ -72,12 +73,14 @@ export class GameScene extends Phaser.Scene {
     super("game");
   }
 
-  init(data: { mode?: GameMode; seed?: string; debugSettings?: Partial<DebugSettings>; telemetryConfig?: Partial<TelemetryConfig>; startMs?: number; progression?: ProgressionState; checkpoint?: CheckpointState }) {
+  init(data: { mode?: GameMode; seed?: string; debugSettings?: Partial<DebugSettings>; telemetryConfig?: Partial<TelemetryConfig>; startMs?: number; progression?: ProgressionState; checkpoint?: CheckpointState; keybinds?: KeybindState }) {
     this.mode = data.mode || "endless";
     this.seed = data.checkpoint?.seed || data.seed || Date.now().toString(36);
     this.initialElapsedMs = data.checkpoint?.elapsedMs ?? Math.max(0, Number(data.startMs || 0));
     this.initialProgression = data.checkpoint?.initialProgression || data.progression || null;
     this.resumeCheckpoint = data.checkpoint || null;
+    this.keybinds = data.keybinds ? { ...data.keybinds } : { ...DEFAULT_KEYBINDS };
+    this.inputKeys = {} as Record<string, Phaser.Input.Keyboard.Key>;
     this.debug = mergeDebugSettings({ ...DEFAULT_DEBUG_SETTINGS }, data.debugSettings || {});
     this.telemetryConfig = {
       enabled: data.checkpoint?.telemetryConfig.enabled ?? data.telemetryConfig?.enabled ?? false,
@@ -268,9 +271,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createInput() {
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = this.input.keyboard!.addKeys("W,A,S,D,SHIFT,ESC") as Record<string, Phaser.Input.Keyboard.Key>;
-    this.input.keyboard!.on("keydown-SHIFT", () => {
+    this.inputKeys = this.input.keyboard!.addKeys({
+      moveUp: this.keybinds.moveUp,
+      moveDown: this.keybinds.moveDown,
+      moveLeft: this.keybinds.moveLeft,
+      moveRight: this.keybinds.moveRight,
+      dash: this.keybinds.dash,
+    }) as Record<string, Phaser.Input.Keyboard.Key>;
+    this.input.keyboard!.on(`keydown-${normalizeKeyName(this.keybinds.dash)}`, () => {
       if (this.elapsedMs >= this.dashAt) this.dashQueued = true;
     });
   }
@@ -337,8 +345,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private getManualDirection() {
-    const x = Number(this.cursors.right.isDown || this.wasd.D.isDown) - Number(this.cursors.left.isDown || this.wasd.A.isDown);
-    const y = Number(this.cursors.down.isDown || this.wasd.S.isDown) - Number(this.cursors.up.isDown || this.wasd.W.isDown);
+    const x = Number(this.isKeyDown("moveRight")) - Number(this.isKeyDown("moveLeft"));
+    const y = Number(this.isKeyDown("moveDown")) - Number(this.isKeyDown("moveUp"));
     const direction = new Phaser.Math.Vector2(x, y).normalize();
     if (direction.lengthSq() > 0) this.lastManualDirection.copy(direction);
     return direction;
@@ -389,6 +397,10 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: this.player, alpha: 0.35, yoyo: true, duration: 80 });
     dashTrail(this, this.player);
     playSound("dash");
+  }
+
+  private isKeyDown(action: keyof KeybindState): boolean {
+    return Boolean(this.inputKeys[action]?.isDown);
   }
 
   private autoShoot() {
