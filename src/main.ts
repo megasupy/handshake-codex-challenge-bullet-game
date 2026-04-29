@@ -64,6 +64,8 @@ const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
 const prefsScreenShake = mustGetInput("prefs-screen-shake");
 const prefsReducedMotion = mustGetInput("prefs-reduced-motion");
+const fullscreenSummary = mustGet("fullscreen-summary");
+const fullscreenToggle = mustGetButton("fullscreen-toggle");
 const keybindsSummary = mustGet("keybinds-summary");
 const bindUp = mustGetButton("bind-up");
 const bindDown = mustGetButton("bind-down");
@@ -146,6 +148,7 @@ playerNameInput.value = getSavedName();
 debugControls.autoplayer.checked = automationConfig.autoplayer || localStorage.getItem(AUTOPLAYER_KEY) === "true";
 if (automationConfig.timeScale !== null) debugControls.timeScale.value = automationConfig.timeScale.toString();
 applyPreferencesToUi(currentPreferences);
+renderFullscreenUi();
 tutorialDontShow.checked = !currentTutorial.seen;
 renderKeybindsPanel();
 
@@ -201,6 +204,7 @@ prefsScreenShake.addEventListener("input", applyPreferenceControls);
 prefsScreenShake.addEventListener("change", applyPreferenceControls);
 prefsReducedMotion.addEventListener("input", applyPreferenceControls);
 prefsReducedMotion.addEventListener("change", applyPreferenceControls);
+fullscreenToggle.addEventListener("click", () => void toggleFullscreen());
 telemetryArchiveCopy.addEventListener("click", copyLatestTelemetryLog);
 telemetryArchiveDownload.addEventListener("click", downloadLatestTelemetryLog);
 telemetryArchiveClear.addEventListener("click", () => {
@@ -250,6 +254,7 @@ mustGetButton("debug-test-sound").addEventListener("click", async () => {
 window.addEventListener("online", () => void syncPendingRuns());
 window.addEventListener("pointerdown", () => void unlockAudio(), { once: true });
 window.addEventListener("keydown", () => void unlockAudio(), { once: true });
+window.addEventListener("fullscreenchange", () => renderFullscreenUi());
 window.addEventListener("keydown", (event) => {
   if (!pendingKeybindAction) return;
   event.preventDefault();
@@ -678,6 +683,24 @@ function applyPreferencesToUi(state: PreferencesState) {
   prefsScreenShake.checked = state.screenShake;
   prefsReducedMotion.checked = state.reducedMotion;
   preferencesSummary.textContent = formatPreferencesSummary(state);
+}
+
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await document.documentElement.requestFullscreen();
+    }
+  } finally {
+    renderFullscreenUi();
+  }
+}
+
+function renderFullscreenUi() {
+  const active = Boolean(document.fullscreenElement);
+  fullscreenSummary.textContent = active ? "Fullscreen mode active." : "Windowed mode.";
+  fullscreenToggle.textContent = active ? "Exit Fullscreen" : "Fullscreen";
 }
 
 function beginKeybindCapture(action: KeybindAction) {
