@@ -81,6 +81,11 @@ const tutorialScreen = mustGet("tutorial-screen");
 const tutorialClose = mustGetButton("tutorial-close");
 const tutorialDontShow = mustGetInput("tutorial-dont-show");
 const gameOver = mustGet("game-over");
+const pauseScreen = mustGet("pause-screen");
+const pauseButton = mustGetButton("pause-button");
+const pauseResume = mustGetButton("pause-resume");
+const pauseRestart = mustGetButton("pause-restart");
+const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
 const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
@@ -127,6 +132,7 @@ let currentKeybinds: KeybindState = readKeybinds();
 let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
 let currentTutorial: TutorialState = readTutorialState();
 let pendingKeybindAction: KeybindAction | null = null;
+let runPaused = false;
 
 if (automationConfig.autoplayer) localStorage.setItem(AUTOPLAYER_KEY, "true");
 playerNameInput.value = getSavedName();
@@ -155,6 +161,10 @@ keybindsReset.addEventListener("click", () => {
   renderKeybindsPanel();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
 });
+pauseButton.addEventListener("click", () => togglePause());
+pauseResume.addEventListener("click", () => resumeRun());
+pauseRestart.addEventListener("click", () => startRun(currentMode));
+pauseMenu.addEventListener("click", () => void showMenu());
 replayButton.addEventListener("click", () => {
   if (!lastRun) return;
   startRun(lastRun.mode, null, lastRun.seed);
@@ -243,6 +253,16 @@ window.addEventListener("keydown", (event) => {
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
 });
 window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" || event.key.toLowerCase() === "p") {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+    if (!getGameScene() || upgradeScreen.classList.contains("hidden") === false || tutorialScreen.classList.contains("hidden") === false || gameOver.classList.contains("hidden") === false) return;
+    event.preventDefault();
+    togglePause();
+    return;
+  }
+});
+window.addEventListener("keydown", (event) => {
   if (event.key === "`") {
     event.preventDefault();
     debugPanel.classList.toggle("hidden");
@@ -310,6 +330,7 @@ gameEvents.addEventListener("game-over", (event) => {
   hideHud();
   hideBossHud();
   hide(debugToggle);
+  hide(pauseButton);
   hide(debugPanel);
   refreshCheckpointUi();
 });
@@ -370,10 +391,13 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
   hide(gameOver);
   hide(upgradeScreen);
   hide(tutorialScreen);
+  hide(pauseScreen);
   hide(debugPanel);
   show(debugToggle);
+  show(pauseButton);
   showHud();
   hideBossHud();
+  runPaused = false;
   game.scene.start("game", {
     mode,
     seed: checkpoint?.seed || seedOverride || automationConfig.seed || (mode === "daily" ? dailySeed() : Date.now().toString(36)),
@@ -391,10 +415,13 @@ async function showMenu() {
   hide(gameOver);
   hide(upgradeScreen);
   hide(tutorialScreen);
+  hide(pauseScreen);
   hide(debugToggle);
+  hide(pauseButton);
   hide(debugPanel);
   hideHud();
   hideBossHud();
+  runPaused = false;
   show(menu);
   renderProgressionPanel();
   game.scene.stop("game");
@@ -606,6 +633,30 @@ function renderKeybindsPanel() {
   keybindsSummary.textContent = pendingKeybindAction
     ? `Press a key for ${pendingKeybindAction}.`
     : formatKeybindSummary(currentKeybinds);
+}
+
+function togglePause() {
+  if (runPaused) {
+    resumeRun();
+    return;
+  }
+  pauseRun();
+}
+
+function pauseRun() {
+  const scene = getGameScene();
+  if (!scene || runPaused) return;
+  scene.pauseRun();
+  runPaused = true;
+  show(pauseScreen);
+}
+
+function resumeRun() {
+  const scene = getGameScene();
+  if (!scene || !runPaused) return;
+  scene.resumeRun();
+  runPaused = false;
+  hide(pauseScreen);
 }
 
 function renderRunSummary(run: RunSummary) {

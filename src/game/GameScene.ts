@@ -46,6 +46,7 @@ export class GameScene extends Phaser.Scene {
   private dashVector = new Phaser.Math.Vector2(1, 0);
   private lastManualDirection = new Phaser.Math.Vector2(1, 0);
   private pausedForUpgrade = false;
+  private manuallyPaused = false;
   private pendingUpgradeOptions: UpgradeOption[] | null = null;
   private nextUpgradeAt = UPGRADE_INTERVAL_MS;
   private nextBossAt = FIRST_BOSS_AT_MS;
@@ -228,6 +229,7 @@ export class GameScene extends Phaser.Scene {
     this.lastManualDirection.set(1, 0);
     this.dashQueued = false;
     this.pausedForUpgrade = false;
+    this.manuallyPaused = false;
     this.nextUpgradeAt = UPGRADE_INTERVAL_MS;
     this.nextBossAt = FIRST_BOSS_AT_MS;
     this.bossEncountersSpawned = 0;
@@ -312,6 +314,20 @@ export class GameScene extends Phaser.Scene {
       this.boss.update(this.elapsedMs, this.player, this.enemyBullets, this.debug);
       this.resolveBossCombat();
     }
+  }
+
+  pauseRun() {
+    if (this.pausedForUpgrade || this.runEnded || this.manuallyPaused) return;
+    this.manuallyPaused = true;
+    this.physics.pause();
+    this.scene.pause();
+  }
+
+  resumeRun() {
+    if (!this.manuallyPaused) return;
+    this.manuallyPaused = false;
+    this.scene.resume();
+    this.physics.resume();
   }
 
   private movePlayer(delta: number) {
@@ -557,6 +573,7 @@ export class GameScene extends Phaser.Scene {
 
   private openUpgradeChoice() {
     this.pausedForUpgrade = true;
+    this.manuallyPaused = false;
     this.physics.pause();
     const options = chooseUpgradeOptions();
     this.pendingUpgradeOptions = options;
@@ -785,6 +802,7 @@ export class GameScene extends Phaser.Scene {
 
   applyUpgrade(id: string) {
     this.pausedForUpgrade = false;
+    this.manuallyPaused = false;
     this.pendingUpgradeOptions = null;
     this.physics.resume();
     const result = applyUpgradeToStats(this.stats, this.health, id);
