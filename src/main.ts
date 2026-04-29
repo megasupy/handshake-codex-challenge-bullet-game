@@ -6,7 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
-import { getSavedName, readRuns } from "./services/localRuns";
+import { getPendingRuns, getSavedName, readRuns } from "./services/localRuns";
 import { formatKeybindSummary, readKeybinds, resetKeybinds, updateKeybind, type KeybindAction, type KeybindState } from "./services/keybinds";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
@@ -63,6 +63,10 @@ const recentRunsList = mustGet("recent-runs-list");
 const achievementsCount = mustGet("achievements-count");
 const achievementsSummary = mustGet("achievements-summary");
 const achievementsList = mustGet("achievements-list");
+const syncStatusPill = mustGet("sync-status-pill");
+const syncStatusSummary = mustGet("sync-status-summary");
+const syncStatusStats = mustGet("sync-status-stats");
+const syncNowButton = mustGetButton("sync-now-button");
 const preferencesSummary = mustGet("preferences-summary");
 const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
@@ -179,6 +183,7 @@ keybindsReset.addEventListener("click", () => {
   renderKeybindsPanel();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
 });
+syncNowButton.addEventListener("click", () => void syncNow());
 pauseButton.addEventListener("click", () => togglePause());
 pauseResume.addEventListener("click", () => resumeRun());
 pauseRestart.addEventListener("click", () => startRun(currentMode));
@@ -259,7 +264,9 @@ mustGetButton("debug-test-sound").addEventListener("click", async () => {
   const ok = await playTestSound();
   if (!ok) console.warn("Audio did not unlock. Check browser/site sound permissions.");
 });
-window.addEventListener("online", () => void syncPendingRuns());
+window.addEventListener("online", () => {
+  void syncPendingRuns().finally(() => renderSyncStatusPanel());
+});
 window.addEventListener("pointerdown", () => void unlockAudio(), { once: true });
 window.addEventListener("keydown", () => void unlockAudio(), { once: true });
 window.addEventListener("fullscreenchange", () => renderFullscreenUi());
@@ -391,6 +398,7 @@ gameEvents.addEventListener("automation-complete", (event) => {
   currentTelemetryArchive = saveTelemetryRun(detail.run);
   renderTelemetryArchive();
   renderTelemetryTimeline();
+  renderSyncStatusPanel();
   publishAutomationResult(detail.run, true);
 });
 
@@ -405,6 +413,7 @@ renderProgressionPanel();
 renderRecordsPanel();
 renderRecentRunsPanel();
 renderAchievementsPanel();
+renderSyncStatusPanel();
 renderTelemetryTimeline();
 refreshCheckpointUi();
 renderTelemetryArchive();
@@ -708,6 +717,30 @@ function renderAchievementsPanel() {
   }
 }
 
+function renderSyncStatusPanel() {
+  const pending = getPendingRuns();
+  const online = navigator.onLine;
+  syncStatusPill.textContent = online ? "Online" : "Offline";
+  syncStatusSummary.textContent = online
+    ? "Local runs will sync automatically when the network is available."
+    : "Runs are saved locally and will sync after reconnecting.";
+
+  syncStatusStats.innerHTML = "";
+  const stats: Record<string, string | number> = {
+    pending: pending.length,
+    localRuns: readRuns().length,
+    archive: readTelemetryArchive().length,
+    network: online ? "ready" : "blocked",
+  };
+
+  for (const [label, value] of Object.entries(stats)) {
+    const stat = document.createElement("div");
+    stat.className = "debug-stat";
+    stat.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    syncStatusStats.append(stat);
+  }
+}
+
 function applyPreferenceControls() {
   currentPreferences = updatePreferences({
     soundVolume: Number(prefsVolume.value),
@@ -874,6 +907,13 @@ function renderTelemetryTimeline() {
   }
 }
 
+async function syncNow() {
+  syncStatusPill.textContent = "Syncing";
+  syncStatusSummary.textContent = "Trying to sync pending runs now.";
+  await syncPendingRuns();
+  renderSyncStatusPanel();
+}
+
 function shouldAutoPause(): boolean {
   if (!getGameScene() || runPaused) return false;
   if (upgradeScreen.classList.contains("hidden") === false || tutorialScreen.classList.contains("hidden") === false || gameOver.classList.contains("hidden") === false || menu.classList.contains("hidden") === false) {
@@ -896,6 +936,7 @@ function syncProfileFromStorage() {
   renderRecordsPanel();
   renderRecentRunsPanel();
   renderAchievementsPanel();
+  renderSyncStatusPanel();
   renderTelemetryTimeline();
   renderTelemetryArchive();
   refreshTutorialUi();
