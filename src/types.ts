@@ -1,4 +1,4 @@
-export type GameMode = "endless" | "daily" | "boss-rush";
+export type GameMode = "endless" | "daily" | "boss-rush" | "campaign";
 
 export type RunRecord = {
   id: string;
@@ -13,6 +13,7 @@ export type RunRecord = {
   synced: boolean;
   note?: string;
   tags?: string[];
+  campaignLevel?: number;
 };
 
 export type LeaderboardResult = {
@@ -40,6 +41,7 @@ export type RunSummary = Omit<RunRecord, "id" | "playerName" | "createdAt" | "sy
   damageBurst?: number;
   damageCornered?: number;
   damageBossContact?: number;
+  campaignLevel?: number;
   upgradePath?: string[];
   chronology?: string[];
 };

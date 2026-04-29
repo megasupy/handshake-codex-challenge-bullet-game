@@ -28,6 +28,8 @@ export type CheckpointState = {
   lastManualDirection: { x: number; y: number };
   pausedForUpgrade: boolean;
   nextUpgradeAt: number;
+  campaignLevel: number;
+  nextCampaignLevelAt: number;
   nextBossAt: number;
   bossEncountersSpawned: number;
   finalApexActive: boolean;
@@ -90,5 +92,6 @@ export function hasCheckpoint(): boolean {
 export function describeCheckpoint(checkpoint: CheckpointState | null): string {
   if (!checkpoint) return "No saved run";
   const time = (checkpoint.elapsedMs / 1000).toFixed(1);
-  return `Resume ${time}s run · Score ${Math.floor(checkpoint.score).toLocaleString()} · Threat ${checkpoint.maxThreatLevel}`;
+  const level = checkpoint.campaignLevel || 1;
+  return `Resume ${time}s run · Score ${Math.floor(checkpoint.score).toLocaleString()} · Threat ${checkpoint.maxThreatLevel} · Level ${level}`;
 }

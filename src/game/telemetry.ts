@@ -22,6 +22,7 @@ export type TelemetrySample = {
   vx: number;
   vy: number;
   health: number;
+  level: number;
   score: number;
   threat: number;
   enemies: number;
@@ -30,6 +31,7 @@ export type TelemetrySample = {
   bossActive: boolean;
   bossHpRatio: number;
   bossPhase: number;
+  campaignLevel: number;
   danger: number;
   projectedDanger: number;
   nearestPickupDistance: number;
@@ -137,6 +139,7 @@ export class TelemetryRecorder {
       stamp(sample.t),
       "SNAP",
       `thr=${sample.threat}`,
+      `lvl=${sample.level}`,
       `hp=${sample.health}`,
       `score=${sample.score}`,
       `pos=${Math.round(sample.x)},${Math.round(sample.y)}`,
@@ -160,6 +163,7 @@ export class TelemetryRecorder {
       `hits=${sample.shotsHit}`,
       `acc=${sample.shotAccuracy}`,
       `phase=${sample.phaseId}`,
+      `camp=${sample.campaignLevel}`,
       `wave=${sample.waveStep}`,
       `pattern=${sample.bossPatternId}`,
     ].join(" ");

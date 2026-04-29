@@ -8,6 +8,7 @@ export type HudPayload = {
   score: number;
   health: number;
   threat: number;
+  level: number;
   kills: number;
   shotsFired: number;
   shotAccuracy: number;

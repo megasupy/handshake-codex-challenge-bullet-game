@@ -60,6 +60,7 @@ const bossHealthFill = mustGet("boss-health-fill");
 const hudKills = mustGet("hud-kills");
 const hudShots = mustGet("hud-shots");
 const hudAccuracy = mustGet("hud-accuracy");
+const hudLevel = mustGet("hud-level");
 const progressionShards = mustGet("progression-shards");
 const progressionSummary = mustGet("progression-summary");
 const checkpointSummary = mustGet("checkpoint-summary");
@@ -186,6 +187,7 @@ const selectedBoardDelete = mustGetButton("selected-board-delete");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
+const campaignButton = mustGetButton("campaign-button");
 const bossRushButton = mustGetButton("boss-rush-button");
 const tutorialButton = mustGetButton("tutorial-button");
 const tutorialSummary = mustGet("tutorial-summary");
@@ -279,6 +281,7 @@ refreshDailySeedUi();
 renderRunTagFilterUi();
 
 playButton.addEventListener("click", () => startRun("endless"));
+campaignButton.addEventListener("click", () => startRun("campaign"));
 resumeButton.addEventListener("click", () => {
   const checkpoint = readCheckpoint();
   if (!checkpoint) return;
@@ -729,6 +732,7 @@ gameEvents.addEventListener("hud", (event) => {
   text("hud-time", `${(detail.timeMs / 1000).toFixed(1)}s`);
   text("hud-score", Math.floor(detail.score).toString());
   text("hud-threat", detail.threat.toString());
+  text("hud-level", detail.level.toString());
   text("hud-health", detail.health.toString());
   text("hud-kills", detail.kills.toString());
   text("hud-shots", detail.shotsFired.toString());
@@ -1175,6 +1179,7 @@ function renderSelectedRunPanel() {
         score: run.score.toLocaleString(),
         kills: run.kills,
         threat: run.maxThreatLevel,
+        level: run.campaignLevel ?? 1,
         seed: run.seed,
       }
     : {
@@ -1281,6 +1286,7 @@ function renderSelectedBoardPanel() {
         time: `${(run.survivalMs / 1000).toFixed(1)}s`,
         score: run.score.toLocaleString(),
         kills: run.kills,
+        level: run.campaignLevel ?? 1,
         seed: run.seed,
       }
     : {
@@ -1744,6 +1750,7 @@ function renderRunSummary(run: RunSummary) {
     accuracy: `${((run.shotAccuracy ?? 0) * 100).toFixed(0)}%`,
     upgrades: run.upgradesTaken ?? 0,
     bosses: run.bossesDefeated ?? 0,
+    level: run.campaignLevel ?? 1,
     maxHp: run.maxHealth ?? 0,
     moveSpeed: run.speed ?? 0,
     threatPeak: run.finalThreat ?? run.maxThreatLevel,
@@ -2276,11 +2283,13 @@ function buildRunReport(run: RunSummary): string {
     `survival: ${(run.survivalMs / 1000).toFixed(1)}s`,
     `score: ${run.score}`,
     `kills: ${run.kills}`,
+    `level: ${run.campaignLevel ?? 1}`,
     `threat: ${run.maxThreatLevel}`,
     `shots: ${run.shotsFired ?? 0}`,
     `accuracy: ${((run.shotAccuracy ?? 0) * 100).toFixed(0)}%`,
     `upgrades: ${run.upgradesTaken ?? 0}`,
     `bosses: ${run.bossesDefeated ?? 0}`,
+    `campaignLevel: ${run.campaignLevel ?? 1}`,
     `buildStyle: ${style.title}`,
     `buildNote: ${style.note}`,
     `damageTaken: ${run.damageTaken ?? 0}`,
@@ -2580,7 +2589,7 @@ function mustGetInput(id: string): HTMLInputElement {
 
 function getAutomationConfig() {
   const active = query.get("autorun") === "1";
-  const mode = query.get("mode") === "daily" ? "daily" : "endless";
+  const mode = query.get("mode") === "daily" || query.get("mode") === "campaign" ? query.get("mode") : "endless";
   const seed = query.get("seed");
   const startMs = Math.max(0, Number(query.get("startMs") || 0));
   const autoplayer = query.get("autoplayer") === "1" || active;

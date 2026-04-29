@@ -10,7 +10,7 @@
       <div id="game-shell" class="relative mx-auto flex min-h-screen max-w-[1800px] items-center justify-center p-3 sm:p-6">
         <div id="game-container" class="relative aspect-[16/9] w-full max-w-[1600px] overflow-hidden rounded-lg border border-line bg-black shadow-glow"></div>
         <div id="toast-stack" aria-live="polite" aria-atomic="true" class="pointer-events-none fixed right-4 top-4 z-50 flex w-[min(92vw,22rem)] flex-col gap-2 sm:right-6 sm:top-6"></div>
-        <div id="hud" class="pointer-events-none absolute left-1/2 top-5 hidden w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 grid-cols-2 gap-2 sm:top-8 sm:grid-cols-4 sm:gap-3 lg:grid-cols-7">
+        <div id="hud" class="pointer-events-none absolute left-1/2 top-5 hidden w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 grid-cols-2 gap-2 sm:top-8 sm:grid-cols-4 sm:gap-3 lg:grid-cols-8">
           <div class="hud-tile">
             <span class="hud-label">Time</span>
             <strong id="hud-time" class="hud-value">0.0</strong>
@@ -22,6 +22,10 @@
           <div class="hud-tile">
             <span class="hud-label">Threat</span>
             <strong id="hud-threat" class="hud-value">1</strong>
+          </div>
+          <div class="hud-tile">
+            <span class="hud-label">Level</span>
+            <strong id="hud-level" class="hud-value">1</strong>
           </div>
           <div class="hud-tile">
             <span class="hud-label">HP</span>
@@ -63,6 +67,7 @@
             </p>
             <div class="mt-7 flex flex-wrap gap-3">
               <button id="play-button" class="btn-primary">Play</button>
+              <button id="campaign-button" class="btn-secondary">Campaign</button>
               <button id="resume-button" class="btn-secondary" disabled>Resume Run</button>
               <button id="daily-button" class="btn-secondary">Daily Seed</button>
               <button id="boss-rush-button" class="btn-secondary">Boss Rush</button>

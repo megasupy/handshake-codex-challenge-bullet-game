@@ -51,6 +51,8 @@ export class GameScene extends Phaser.Scene {
   private manuallyPaused = false;
   private pendingUpgradeOptions: UpgradeOption[] | null = null;
   private nextUpgradeAt = UPGRADE_INTERVAL_MS;
+  private campaignLevel = 1;
+  private nextCampaignLevelAt = 20000;
   private nextBossAt = FIRST_BOSS_AT_MS;
   private bossEncountersSpawned = 0;
   private finalApexActive = false;
@@ -142,6 +144,7 @@ export class GameScene extends Phaser.Scene {
 
     const threat = this.getThreatLevel();
     this.maxThreatLevel = Math.max(this.maxThreatLevel, threat);
+    this.advanceCampaignLevel();
 
     this.movePlayer(delta);
     this.autoShoot();
@@ -241,6 +244,8 @@ export class GameScene extends Phaser.Scene {
     this.pausedForUpgrade = false;
     this.manuallyPaused = false;
     this.nextUpgradeAt = UPGRADE_INTERVAL_MS;
+    this.campaignLevel = 1;
+    this.nextCampaignLevelAt = 20000;
     this.nextBossAt = FIRST_BOSS_AT_MS;
     this.bossEncountersSpawned = 0;
     this.finalApexActive = false;
@@ -684,6 +689,24 @@ export class GameScene extends Phaser.Scene {
     return Math.max(1, Math.floor(this.elapsedMs / 7500) + 1);
   }
 
+  private advanceCampaignLevel() {
+    if (this.mode !== "campaign") return;
+    while (this.elapsedMs >= this.nextCampaignLevelAt) {
+      this.campaignLevel += 1;
+      this.nextCampaignLevelAt += 20000;
+      this.score += 20 * this.campaignLevel;
+      this.stats.speed += 4;
+      this.stats.fireRate = Math.max(90, this.stats.fireRate - 6);
+      this.stats.projectileSpeed += 10;
+      this.recordChronology(`Campaign level ${this.campaignLevel}`);
+      this.telemetry?.logEvent(this.elapsedMs, "campaign-level", { level: this.campaignLevel });
+      combatText(this, this.player.x, this.player.y - 40, `LEVEL ${this.campaignLevel}`, getVisualPalette().pickup);
+      upgradePulse(this, this.player);
+      playSound("upgrade");
+      this.maybeShake(90, 0.0025);
+    }
+  }
+
   private getEnemyPhaseId(): 1 | 2 | 3 {
     if (this.bossEncountersSpawned <= 0) return 1;
     if (this.bossEncountersSpawned === 1) return 2;
@@ -707,6 +730,7 @@ export class GameScene extends Phaser.Scene {
       score: Math.floor(this.score),
       health: this.health,
       threat: this.getThreatLevel(),
+      level: this.campaignLevel,
       kills: this.kills,
       shotsFired: this.playerShotsFired,
       shotAccuracy: this.playerShotsFired > 0 ? Math.round((this.playerShotsHit / this.playerShotsFired) * 100) / 100 : 0,
@@ -736,6 +760,7 @@ export class GameScene extends Phaser.Scene {
       threat: this.getThreatLevel(),
       score: Math.floor(this.score),
       health: this.health,
+      level: this.campaignLevel,
       kills: this.kills,
       enemies: this.enemies.countActive(true),
       playerShots: this.playerShots.countActive(true),
@@ -780,6 +805,7 @@ export class GameScene extends Phaser.Scene {
       damageBurst: this.damageBurst,
       damageCornered: this.damageCornered,
       damageBossContact: this.damageBossContact,
+      campaignLevel: this.campaignLevel,
     };
 
     this.scene.pause();
@@ -798,6 +824,7 @@ export class GameScene extends Phaser.Scene {
         bossActive: Boolean(this.boss),
         bossPhase: this.boss?.phase ?? 0,
         bossHpRatio: this.boss ? round(this.boss.hp / this.boss.maxHp) : 0,
+        campaignLevel: this.campaignLevel,
         danger: round(autoplayer.danger),
         projectedDanger: round(autoplayer.projectedDanger),
         reasonTag: autoplayer.reason,
@@ -870,6 +897,7 @@ export class GameScene extends Phaser.Scene {
       vx: round(body.velocity.x),
       vy: round(body.velocity.y),
       health: this.health,
+      level: this.campaignLevel,
       score: Math.floor(this.score),
       threat: this.getThreatLevel(),
       enemies: this.enemies.countActive(true),
@@ -878,6 +906,7 @@ export class GameScene extends Phaser.Scene {
       bossActive: Boolean(this.boss),
       bossHpRatio: this.boss ? round(this.boss.hp / this.boss.maxHp) : 0,
       bossPhase: this.boss?.phase ?? 0,
+      campaignLevel: this.campaignLevel,
       dashReady: this.elapsedMs >= this.dashAt,
       frameMs: round(this.lastFrameMs),
       edgeDistance: round(Math.min(this.player.x, ARENA_WIDTH - this.player.x, this.player.y, ARENA_HEIGHT - this.player.y)),
@@ -950,6 +979,8 @@ export class GameScene extends Phaser.Scene {
       lastManualDirection: { x: this.lastManualDirection.x, y: this.lastManualDirection.y },
       pausedForUpgrade: this.pausedForUpgrade,
       nextUpgradeAt: this.nextUpgradeAt,
+      campaignLevel: this.campaignLevel,
+      nextCampaignLevelAt: this.nextCampaignLevelAt,
       nextBossAt: this.nextBossAt,
       bossEncountersSpawned: this.bossEncountersSpawned,
       finalApexActive: this.finalApexActive,
@@ -1065,6 +1096,8 @@ export class GameScene extends Phaser.Scene {
     this.pausedForUpgrade = checkpoint.pausedForUpgrade;
     this.pendingUpgradeOptions = checkpoint.upgradeOptions ? [...checkpoint.upgradeOptions] : null;
     this.nextUpgradeAt = checkpoint.nextUpgradeAt;
+    this.campaignLevel = checkpoint.campaignLevel || 1;
+    this.nextCampaignLevelAt = checkpoint.nextCampaignLevelAt || 20000;
     this.nextBossAt = checkpoint.nextBossAt;
     this.bossEncountersSpawned = checkpoint.bossEncountersSpawned;
     this.finalApexActive = checkpoint.finalApexActive;
