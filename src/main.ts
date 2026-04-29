@@ -150,6 +150,7 @@ const tutorialButton = mustGetButton("tutorial-button");
 const tutorialSummary = mustGet("tutorial-summary");
 const dailySeedPreview = mustGet("daily-seed-preview");
 const dailySeedCopy = mustGetButton("daily-seed-copy");
+const runSearch = mustGetInput("run-search");
 const submitButton = mustGetButton("submit-button");
 const replayButton = mustGetButton("replay-button");
 const copySeedButton = mustGetButton("copy-seed-button");
@@ -200,6 +201,7 @@ let currentLeaderboardRows: RunRecord[] = [];
 let selectedRecentRun: RunRecord | null = null;
 let selectedBoardRun: RunRecord | null = null;
 let telemetryFilterValue = "";
+let runSearchValue = "";
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 let toastId = 0;
@@ -214,6 +216,7 @@ renderFullscreenUi();
 tutorialDontShow.checked = !currentTutorial.seen;
 renderKeybindsPanel();
 telemetryFilter.value = "";
+runSearch.value = "";
 refreshDailySeedUi();
 
 playButton.addEventListener("click", () => startRun("endless"));
@@ -397,6 +400,11 @@ telemetryFilter.addEventListener("input", () => {
   renderTelemetryArchive();
   renderTelemetryTimeline();
   renderRunFeed();
+});
+runSearch.addEventListener("input", () => {
+  runSearchValue = runSearch.value.trim().toLowerCase();
+  renderRecentRunsPanel();
+  renderLeaderboard({ source: leaderboardSource.textContent === "Online" ? "remote" : "local", rows: currentLeaderboardRows });
 });
 profileBackupExport.addEventListener("click", () => {
   const backup = exportProfileBackup();
@@ -810,11 +818,11 @@ function renderLeaderboard(result: LeaderboardResult) {
   currentLeaderboardRows = [...result.rows];
   leaderboardList.innerHTML = "";
 
-  const rows = result.rows.slice(0, 10);
+  const rows = filterRuns(result.rows).slice(0, 10);
   if (rows.length === 0) {
     const empty = document.createElement("li");
     empty.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
-    empty.textContent = "No runs yet.";
+    empty.textContent = runSearchValue ? "No leaderboard runs match the search." : "No runs yet.";
     leaderboardList.append(empty);
     selectedBoardRun = null;
     renderSelectedBoardPanel();
@@ -928,17 +936,22 @@ function renderSelectedRunPanel() {
 }
 
 function renderRecentRunsPanel() {
-  const runs = readRuns();
-  recentRunsCount.textContent = `${runs.length} run${runs.length === 1 ? "" : "s"}`;
+  const allRuns = readRuns();
+  const runs = filterRuns(allRuns);
+  recentRunsCount.textContent = runSearchValue ? `${runs.length}/${allRuns.length} run${allRuns.length === 1 ? "" : "s"}` : `${runs.length} run${runs.length === 1 ? "" : "s"}`;
   recentRunsSummary.textContent = runs.length > 0
-    ? "Recently submitted runs are stored locally and mirrored to the leaderboard when possible."
-    : "Recently submitted runs are stored locally on this device.";
+    ? runSearchValue
+      ? `Filtered to "${runSearchValue}". Recently submitted runs are stored locally and mirrored to the leaderboard when possible.`
+      : "Recently submitted runs are stored locally and mirrored to the leaderboard when possible."
+    : runSearchValue
+      ? `No local runs match "${runSearchValue}".`
+      : "Recently submitted runs are stored locally on this device.";
   recentRunsList.innerHTML = "";
 
   if (runs.length === 0) {
     const item = document.createElement("li");
     item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
-    item.textContent = "No recent runs yet.";
+    item.textContent = runSearchValue ? "No recent runs match the search." : "No recent runs yet.";
     recentRunsList.append(item);
     selectedRecentRun = null;
     renderSelectedRunPanel();
@@ -994,6 +1007,27 @@ function renderSelectedBoardPanel() {
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
     selectedBoardSummary.append(item);
   }
+}
+
+function filterRuns(runs: RunRecord[]): RunRecord[] {
+  if (!runSearchValue) return runs;
+  return runs.filter((run) => matchesRunSearch(run));
+}
+
+function matchesRunSearch(run: RunRecord): boolean {
+  const filter = runSearchValue;
+  if (!filter) return true;
+  const haystack = [
+    run.id,
+    run.playerName,
+    run.mode,
+    run.seed,
+    run.score.toString(),
+    run.kills.toString(),
+    run.maxThreatLevel.toString(),
+    `${(run.survivalMs / 1000).toFixed(1)}s`,
+  ].join(" ").toLowerCase();
+  return haystack.includes(filter);
 }
 
 function renderAchievementsPanel() {
