@@ -134,6 +134,11 @@ const leaderboardSource = mustGet("leaderboard-source");
 const leaderboardModeEndless = mustGetButton("leaderboard-mode-endless");
 const leaderboardModeDaily = mustGetButton("leaderboard-mode-daily");
 const leaderboardRefresh = mustGetButton("leaderboard-refresh");
+const selectedBoardSync = mustGet("selected-board-sync");
+const selectedBoardSummary = mustGet("selected-board-summary");
+const selectedBoardReplay = mustGetButton("selected-board-replay");
+const selectedBoardCopySeed = mustGetButton("selected-board-copy-seed");
+const selectedBoardCopyLink = mustGetButton("selected-board-copy-link");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
@@ -184,7 +189,9 @@ let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
 let currentTutorial: TutorialState = readTutorialState();
 let currentHudState: HudPayload | null = null;
 let currentBossHudState: BossHudPayload | null = null;
+let currentLeaderboardRows: RunRecord[] = [];
 let selectedRecentRun: RunRecord | null = null;
+let selectedBoardRun: RunRecord | null = null;
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 
@@ -291,6 +298,38 @@ leaderboardModeDaily.addEventListener("click", () => {
   leaderboardMode = "daily";
   renderLeaderboardModeButtons();
   void refreshLeaderboard(leaderboardMode);
+});
+leaderboardList.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const item = target.closest("[data-board-run-id]") as HTMLElement | null;
+  if (!item) return;
+  const run = currentLeaderboardRows.find((entry) => entry.id === item.dataset.boardRunId);
+  if (!run) return;
+  selectedBoardRun = run;
+  renderSelectedBoardPanel();
+});
+selectedBoardReplay.addEventListener("click", () => {
+  if (!selectedBoardRun) return;
+  startRun(selectedBoardRun.mode, null, selectedBoardRun.seed);
+});
+selectedBoardCopySeed.addEventListener("click", async () => {
+  if (!selectedBoardRun) return;
+  try {
+    await navigator.clipboard.writeText(selectedBoardRun.seed);
+    submitStatus.textContent = "Leaderboard seed copied.";
+  } catch {
+    submitStatus.textContent = selectedBoardRun.seed;
+  }
+});
+selectedBoardCopyLink.addEventListener("click", async () => {
+  if (!selectedBoardRun) return;
+  const link = buildRunLink(selectedBoardRun);
+  try {
+    await navigator.clipboard.writeText(link);
+    submitStatus.textContent = "Leaderboard link copied.";
+  } catch {
+    submitStatus.textContent = link;
+  }
 });
 submitButton.addEventListener("click", submitCurrentRun);
 debugToggle.addEventListener("click", () => debugPanel.classList.toggle("hidden"));
@@ -701,6 +740,7 @@ function renderLeaderboardModeButtons() {
 
 function renderLeaderboard(result: LeaderboardResult) {
   leaderboardSource.textContent = result.source === "remote" ? "Online" : "Local";
+  currentLeaderboardRows = [...result.rows];
   leaderboardList.innerHTML = "";
 
   const rows = result.rows.slice(0, 10);
@@ -709,10 +749,16 @@ function renderLeaderboard(result: LeaderboardResult) {
     empty.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
     empty.textContent = "No runs yet.";
     leaderboardList.append(empty);
+    selectedBoardRun = null;
+    renderSelectedBoardPanel();
     return;
   }
 
   rows.forEach((run, index) => leaderboardList.append(createLeaderboardRow(run, index)));
+  if (!selectedBoardRun || !rows.some((run) => run.id === selectedBoardRun?.id)) {
+    selectedBoardRun = rows[0] || null;
+  }
+  renderSelectedBoardPanel();
 }
 
 function renderProgressionPanel() {
@@ -850,6 +896,37 @@ function renderRecentRunsPanel() {
     selectedRecentRun = runs[0] || null;
   }
   renderSelectedRunPanel();
+}
+
+function renderSelectedBoardPanel() {
+  const run = selectedBoardRun;
+  selectedBoardSync.textContent = run?.synced ? "Synced" : run ? "Local" : "None";
+  selectedBoardSummary.innerHTML = "";
+
+  const rows: Record<string, string | number> = run
+    ? {
+        player: run.playerName,
+        mode: run.mode.toUpperCase(),
+        time: `${(run.survivalMs / 1000).toFixed(1)}s`,
+        score: run.score.toLocaleString(),
+        kills: run.kills,
+        seed: run.seed,
+      }
+    : {
+        player: "None",
+        mode: "None",
+        time: "-",
+        score: "-",
+        kills: "-",
+        seed: "-",
+      };
+
+  for (const [label, value] of Object.entries(rows)) {
+    const item = document.createElement("div");
+    item.className = "debug-stat";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    selectedBoardSummary.append(item);
+  }
 }
 
 function renderAchievementsPanel() {
@@ -1367,7 +1444,8 @@ function refreshCheckpointUi() {
 
 function createLeaderboardRow(run: RunRecord, index: number) {
   const row = document.createElement("li");
-  row.className = "leaderboard-row";
+  row.className = "leaderboard-row cursor-pointer";
+  row.dataset.boardRunId = run.id;
   const time = (run.survivalMs / 1000).toFixed(1);
   row.innerHTML = `
     <span class="font-black text-pulse">${index + 1}</span>
