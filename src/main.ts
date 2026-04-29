@@ -123,6 +123,7 @@ const pauseRestart = mustGetButton("pause-restart");
 const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
 const runComparison = mustGet("run-comparison");
+const runSeed = mustGet("run-seed");
 const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
 const leaderboardModeEndless = mustGetButton("leaderboard-mode-endless");
@@ -136,6 +137,7 @@ const tutorialButton = mustGetButton("tutorial-button");
 const tutorialSummary = mustGet("tutorial-summary");
 const submitButton = mustGetButton("submit-button");
 const replayButton = mustGetButton("replay-button");
+const copySeedButton = mustGetButton("copy-seed-button");
 const copyLinkButton = mustGetButton("copy-link-button");
 const restartButton = mustGetButton("restart-button");
 const menuButton = mustGetButton("menu-button");
@@ -218,6 +220,15 @@ pauseMenu.addEventListener("click", () => void showMenu());
 replayButton.addEventListener("click", () => {
   if (!lastRun) return;
   startRun(lastRun.mode, null, lastRun.seed);
+});
+copySeedButton.addEventListener("click", async () => {
+  if (!lastRun) return;
+  try {
+    await navigator.clipboard.writeText(lastRun.seed);
+    submitStatus.textContent = "Seed copied.";
+  } catch {
+    submitStatus.textContent = lastRun.seed;
+  }
 });
 copyLinkButton.addEventListener("click", async () => {
   if (!lastRun) return;
@@ -407,6 +418,7 @@ gameEvents.addEventListener("game-over", (event) => {
   text("final-time", `${(lastRun.survivalMs / 1000).toFixed(1)}s`);
   text("final-kills", `${lastRun.kills} kills`);
   text("final-threat", `Threat ${lastRun.maxThreatLevel}`);
+  text("run-seed", lastRun.seed);
   renderRunSummary(lastRun);
   renderRunComparison(lastRun, previousRecords);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
