@@ -1229,7 +1229,7 @@ function renderTelemetryArchive() {
     : currentTelemetryArchive;
   telemetryArchiveCount.textContent = `${entries.length} log${entries.length === 1 ? "" : "s"}`;
   telemetryArchiveSummary.textContent = entries.length > 0
-    ? formatTelemetryArchiveEntry(entries[0])
+    ? `${formatTelemetryArchiveEntry(entries[0])}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`
     : "The latest completed telemetry run is saved locally for review.";
   telemetryArchiveList.innerHTML = "";
 
@@ -1474,24 +1474,24 @@ function refreshTutorialUi() {
 }
 
 async function copyLatestTelemetryLog() {
-  const entry = currentTelemetryArchive[0];
+  const entry = getFilteredTelemetryEntries()[0];
   if (!entry) return;
   try {
     await navigator.clipboard.writeText(entry.logText);
-    telemetryArchiveSummary.textContent = "Latest telemetry log copied.";
+    telemetryArchiveSummary.textContent = telemetryFilterValue ? "Filtered telemetry log copied." : "Latest telemetry log copied.";
   } catch {
     telemetryArchiveSummary.textContent = entry.logText;
   }
 }
 
 function downloadLatestTelemetryLog() {
-  const entry = currentTelemetryArchive[0];
+  const entry = getFilteredTelemetryEntries()[0];
   if (!entry) return;
   const blob = new Blob([entry.logText], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${entry.runId}.log`;
+  anchor.download = telemetryFilterValue ? `${entry.runId}.filtered.log` : `${entry.runId}.log`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -1524,6 +1524,12 @@ function buildRunReport(run: RunSummary): string {
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
   ];
   return lines.join("\n");
+}
+
+function getFilteredTelemetryEntries(): TelemetryArchiveEntry[] {
+  return telemetryFilterValue
+    ? currentTelemetryArchive.filter((entry) => matchesTelemetryEntry(entry, telemetryFilterValue))
+    : currentTelemetryArchive;
 }
 
 function readLeaderboardMode(): GameMode {
