@@ -292,6 +292,13 @@
             <p class="eyebrow">Paused</p>
             <h2 class="text-4xl font-black text-white">Run paused</h2>
             <p class="mt-4 text-sm leading-6 text-slate-300">Take a break, change settings, or return to the menu without losing the run.</p>
+            <div class="mt-6 grid grid-cols-2 gap-2 text-xs" id="pause-snapshot">
+              <div class="debug-stat"><span class="block uppercase tracking-wider text-slate-500">time</span><strong id="pause-time" class="block truncate text-white">0.0s</strong></div>
+              <div class="debug-stat"><span class="block uppercase tracking-wider text-slate-500">score</span><strong id="pause-score" class="block truncate text-white">0</strong></div>
+              <div class="debug-stat"><span class="block uppercase tracking-wider text-slate-500">threat</span><strong id="pause-threat" class="block truncate text-white">1</strong></div>
+              <div class="debug-stat"><span class="block uppercase tracking-wider text-slate-500">hp</span><strong id="pause-hp" class="block truncate text-white">3</strong></div>
+              <div class="debug-stat col-span-2"><span class="block uppercase tracking-wider text-slate-500">boss</span><strong id="pause-boss" class="block truncate text-white">none</strong></div>
+            </div>
             <div class="mt-6 flex flex-wrap gap-3">
               <button id="pause-resume" class="btn-primary">Resume</button>
               <button id="pause-restart" class="btn-secondary">Restart</button>

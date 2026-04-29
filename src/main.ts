@@ -112,6 +112,11 @@ const tutorialClose = mustGetButton("tutorial-close");
 const tutorialDontShow = mustGetInput("tutorial-dont-show");
 const gameOver = mustGet("game-over");
 const pauseScreen = mustGet("pause-screen");
+const pauseTime = mustGet("pause-time");
+const pauseScore = mustGet("pause-score");
+const pauseThreat = mustGet("pause-threat");
+const pauseHp = mustGet("pause-hp");
+const pauseBoss = mustGet("pause-boss");
 const pauseButton = mustGetButton("pause-button");
 const pauseResume = mustGetButton("pause-resume");
 const pauseRestart = mustGetButton("pause-restart");
@@ -169,6 +174,8 @@ let currentAchievements: AchievementState = readAchievements();
 let currentKeybinds: KeybindState = readKeybinds();
 let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
 let currentTutorial: TutorialState = readTutorialState();
+let currentHudState: HudPayload | null = null;
+let currentBossHudState: BossHudPayload | null = null;
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 
@@ -357,10 +364,12 @@ Object.values(debugControls).forEach((control) => {
 
 gameEvents.addEventListener("hud", (event) => {
   const detail = (event as CustomEvent<HudPayload>).detail;
+  currentHudState = detail;
   text("hud-time", `${(detail.timeMs / 1000).toFixed(1)}s`);
   text("hud-score", Math.floor(detail.score).toString());
   text("hud-threat", detail.threat.toString());
   text("hud-health", detail.health.toString());
+  if (runPaused) renderPauseSnapshot();
 });
 
 gameEvents.addEventListener("upgrade", (event) => {
@@ -414,8 +423,10 @@ gameEvents.addEventListener("game-over", (event) => {
 
 gameEvents.addEventListener("boss-hud", (event) => {
   const detail = (event as CustomEvent<BossHudPayload>).detail;
+  currentBossHudState = detail;
   if (!detail.active) {
     hideBossHud();
+    if (runPaused) renderPauseSnapshot();
     return;
   }
 
@@ -423,6 +434,7 @@ gameEvents.addEventListener("boss-hud", (event) => {
   bossPhase.textContent = `Phase ${detail.phase}`;
   bossHealthFill.style.width = `${Math.max(0, Math.min(100, (detail.hp / detail.maxHp) * 100))}%`;
   show(bossHud);
+  if (runPaused) renderPauseSnapshot();
 });
 
 gameEvents.addEventListener("debug-stats", (event) => {
@@ -901,6 +913,7 @@ function pauseRun() {
   if (!scene || runPaused) return;
   scene.pauseRun();
   runPaused = true;
+  renderPauseSnapshot();
   show(pauseScreen);
 }
 
@@ -934,6 +947,19 @@ function renderRunSummary(run: RunSummary) {
     item.className = "debug-stat";
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
     runSummary.append(item);
+  }
+}
+
+function renderPauseSnapshot() {
+  const hud = currentHudState;
+  pauseTime.textContent = hud ? `${(hud.timeMs / 1000).toFixed(1)}s` : "0.0s";
+  pauseScore.textContent = hud ? Math.floor(hud.score).toString() : "0";
+  pauseThreat.textContent = hud ? hud.threat.toString() : "1";
+  pauseHp.textContent = hud ? hud.health.toString() : "3";
+  if (currentBossHudState?.active) {
+    pauseBoss.textContent = `${currentBossHudState.name} · Phase ${currentBossHudState.phase} · ${Math.max(0, Math.min(100, Math.round((currentBossHudState.hp / currentBossHudState.maxHp) * 100)))}%`;
+  } else {
+    pauseBoss.textContent = "none";
   }
 }
 
