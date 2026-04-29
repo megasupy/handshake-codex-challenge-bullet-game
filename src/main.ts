@@ -145,6 +145,8 @@ const dailyButton = mustGetButton("daily-button");
 const bossRushButton = mustGetButton("boss-rush-button");
 const tutorialButton = mustGetButton("tutorial-button");
 const tutorialSummary = mustGet("tutorial-summary");
+const dailySeedPreview = mustGet("daily-seed-preview");
+const dailySeedCopy = mustGetButton("daily-seed-copy");
 const submitButton = mustGetButton("submit-button");
 const replayButton = mustGetButton("replay-button");
 const copySeedButton = mustGetButton("copy-seed-button");
@@ -204,6 +206,7 @@ renderSettingsPresetPanel();
 renderFullscreenUi();
 tutorialDontShow.checked = !currentTutorial.seen;
 renderKeybindsPanel();
+refreshDailySeedUi();
 
 playButton.addEventListener("click", () => startRun("endless"));
 resumeButton.addEventListener("click", () => {
@@ -214,6 +217,14 @@ resumeButton.addEventListener("click", () => {
 dailyButton.addEventListener("click", () => startRun("daily"));
 bossRushButton.addEventListener("click", () => startRun("boss-rush", null, undefined, 58000));
 tutorialButton.addEventListener("click", () => showTutorial());
+dailySeedCopy.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(dailySeedPreview.textContent || dailySeed());
+    submitStatus.textContent = "Daily seed copied.";
+  } catch {
+    submitStatus.textContent = dailySeedPreview.textContent || dailySeed();
+  }
+});
 bindUp.addEventListener("click", () => beginKeybindCapture("moveUp"));
 bindDown.addEventListener("click", () => beginKeybindCapture("moveDown"));
 bindLeft.addEventListener("click", () => beginKeybindCapture("moveLeft"));
@@ -1138,6 +1149,10 @@ function renderRunComparison(run: RunSummary, previous: RecordsState) {
     item.innerHTML = `<span class=\"block uppercase tracking-wider text-slate-500\">${label}</span><strong class=\"block truncate text-white\">${escapeHtml(String(value))}</strong>`;
     runComparison.append(item);
   }
+}
+
+function refreshDailySeedUi() {
+  dailySeedPreview.textContent = dailySeed();
 }
 
 function formatDelta(current: number, best: number): string {
