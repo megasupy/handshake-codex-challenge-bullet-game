@@ -54,6 +54,7 @@ export type BossHudPayload = {
   hp: number;
   maxHp: number;
   phase: number;
+  patternId?: string;
 };
 
 export type AutomationCompletePayload = {

@@ -715,6 +715,7 @@ export class GameScene extends Phaser.Scene {
       hp: this.boss.hp,
       maxHp: this.boss.maxHp,
       phase: this.boss.phase,
+      patternId: this.boss.getPatternId(),
     });
   }
 

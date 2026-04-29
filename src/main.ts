@@ -53,6 +53,7 @@ const hud = mustGet("hud");
 const bossHud = mustGet("boss-hud");
 const bossName = mustGet("boss-name");
 const bossPhase = mustGet("boss-phase");
+const bossPattern = mustGet("boss-pattern");
 const bossHealthFill = mustGet("boss-health-fill");
 const progressionShards = mustGet("progression-shards");
 const progressionSummary = mustGet("progression-summary");
@@ -666,6 +667,7 @@ gameEvents.addEventListener("boss-hud", (event) => {
 
   bossName.textContent = detail.name;
   bossPhase.textContent = `Phase ${detail.phase}`;
+  bossPattern.textContent = detail.patternId ? `Pattern ${formatBossPattern(detail.patternId)}` : "Pattern idle";
   bossHealthFill.style.width = `${Math.max(0, Math.min(100, (detail.hp / detail.maxHp) * 100))}%`;
   show(bossHud);
   if (runPaused) renderPauseSnapshot();
@@ -1617,6 +1619,11 @@ function describeBossEvent(data: Record<string, string>): string {
   const name = names[bossId] || `Boss ${bossId || "?"}`;
   const apex = data.finalApex === "true" ? "final apex" : "";
   return [name, apex].filter(Boolean).join(" ");
+}
+
+function formatBossPattern(patternId: string): string {
+  const suffix = patternId.split("-").slice(2).join("-");
+  return suffix.replace(/-/g, " ");
 }
 
 async function syncNow() {
