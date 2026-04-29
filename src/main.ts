@@ -7,6 +7,7 @@ import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayl
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
 import { getSavedName } from "./services/localRuns";
+import { clearTelemetryArchive, formatTelemetryArchiveEntry, readTelemetryArchive, saveTelemetryRun, type TelemetryArchiveEntry } from "./services/telemetryArchive";
 import { formatPreferencesSummary, readPreferences, updatePreferences, type PreferencesState } from "./services/preferences";
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
 import type { GameMode, LeaderboardResult, RunRecord, RunSummary } from "./types";
@@ -54,6 +55,12 @@ const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
 const prefsScreenShake = mustGetInput("prefs-screen-shake");
 const prefsReducedMotion = mustGetInput("prefs-reduced-motion");
+const telemetryArchiveCount = mustGet("telemetry-archive-count");
+const telemetryArchiveSummary = mustGet("telemetry-archive-summary");
+const telemetryArchiveList = mustGet("telemetry-archive-list");
+const telemetryArchiveCopy = mustGetButton("telemetry-archive-copy");
+const telemetryArchiveDownload = mustGetButton("telemetry-archive-download");
+const telemetryArchiveClear = mustGetButton("telemetry-archive-clear");
 const upgradeScreen = mustGet("upgrade-screen");
 const gameOver = mustGet("game-over");
 const runSummary = mustGet("run-summary");
@@ -96,6 +103,7 @@ let lastRun: RunSummary | null = null;
 let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
 let currentPreferences: PreferencesState = readPreferences();
+let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
 
 if (automationConfig.autoplayer) localStorage.setItem(AUTOPLAYER_KEY, "true");
 playerNameInput.value = getSavedName();
@@ -139,6 +147,13 @@ prefsScreenShake.addEventListener("input", applyPreferenceControls);
 prefsScreenShake.addEventListener("change", applyPreferenceControls);
 prefsReducedMotion.addEventListener("input", applyPreferenceControls);
 prefsReducedMotion.addEventListener("change", applyPreferenceControls);
+telemetryArchiveCopy.addEventListener("click", copyLatestTelemetryLog);
+telemetryArchiveDownload.addEventListener("click", downloadLatestTelemetryLog);
+telemetryArchiveClear.addEventListener("click", () => {
+  clearTelemetryArchive();
+  currentTelemetryArchive = [];
+  renderTelemetryArchive();
+});
 mustGetButton("debug-apply-time").addEventListener("click", () => getGameScene()?.setElapsedSeconds(Number(debugControls.time.value) || 0));
 mustGetButton("debug-clear").addEventListener("click", () => getGameScene()?.clearThreats());
 mustGetButton("debug-kill").addEventListener("click", () => getGameScene()?.forceEndRun());
@@ -243,6 +258,8 @@ gameEvents.addEventListener("debug-stats", (event) => {
 gameEvents.addEventListener("automation-complete", (event) => {
   const detail = (event as CustomEvent<AutomationCompletePayload>).detail;
   if (!automationConfig.active || !detail.run) return;
+  currentTelemetryArchive = saveTelemetryRun(detail.run);
+  renderTelemetryArchive();
   publishAutomationResult(detail.run, true);
 });
 
@@ -255,6 +272,7 @@ gameEvents.addEventListener("automation-snapshot", (event) => {
 void refreshLeaderboard("endless");
 renderProgressionPanel();
 refreshCheckpointUi();
+renderTelemetryArchive();
 if (automationConfig.active) {
   queueMicrotask(() => startRun(automationConfig.mode));
 } else if (debugControls.autoplayer.checked) {
@@ -511,6 +529,55 @@ function renderRunSummary(run: RunSummary) {
     item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
     runSummary.append(item);
   }
+}
+
+function renderTelemetryArchive() {
+  telemetryArchiveCount.textContent = `${currentTelemetryArchive.length} log${currentTelemetryArchive.length === 1 ? "" : "s"}`;
+  telemetryArchiveSummary.textContent = currentTelemetryArchive.length > 0
+    ? formatTelemetryArchiveEntry(currentTelemetryArchive[0])
+    : "The latest completed telemetry run is saved locally for review.";
+  telemetryArchiveList.innerHTML = "";
+
+  if (currentTelemetryArchive.length === 0) {
+    const item = document.createElement("li");
+    item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-4 text-sm text-slate-400";
+    item.textContent = "No telemetry logs saved yet.";
+    telemetryArchiveList.append(item);
+    return;
+  }
+
+  currentTelemetryArchive.slice(0, 3).forEach((entry) => {
+    const item = document.createElement("li");
+    item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-300";
+    item.innerHTML = `
+      <strong class="block truncate text-white">${escapeHtml(entry.runId)}</strong>
+      <span class="mt-1 block text-xs leading-5 text-slate-400">${escapeHtml(formatTelemetryArchiveEntry(entry))}</span>
+    `;
+    telemetryArchiveList.append(item);
+  });
+}
+
+async function copyLatestTelemetryLog() {
+  const entry = currentTelemetryArchive[0];
+  if (!entry) return;
+  try {
+    await navigator.clipboard.writeText(entry.logText);
+    telemetryArchiveSummary.textContent = "Latest telemetry log copied.";
+  } catch {
+    telemetryArchiveSummary.textContent = entry.logText;
+  }
+}
+
+function downloadLatestTelemetryLog() {
+  const entry = currentTelemetryArchive[0];
+  if (!entry) return;
+  const blob = new Blob([entry.logText], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${entry.runId}.log`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function buildReplayLink(run: RunSummary) {
