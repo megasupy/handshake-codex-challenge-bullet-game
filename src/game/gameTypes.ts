@@ -5,6 +5,7 @@ export type EnemyData = {
   hp: number;
   speed: number;
   fireAt: number;
+  casts: number;
 };
 
 export type PlayerStats = {

@@ -105,7 +105,8 @@ export function updateEnemies(args: {
     }
 
     if (args.elapsedMs >= data.fireAt && data.kind !== "chaser" && data.kind !== "minion") {
-      firePattern(args.scene, args.enemyBullets, enemy, data.kind, args.threat, args.debug, args.player);
+      firePattern(args.scene, args.enemyBullets, enemy, data.kind, args.threat, args.debug, args.player, data.casts);
+      data.casts += 1;
       data.fireAt = args.elapsedMs + getEnemyFireCadenceMs(data.kind, args.threat, args.debug);
 
       if (data.kind === "summoner" && args.enemies.countActive(true) < Math.max(24, Math.floor(args.debug.enemyCap * 0.4))) {
@@ -124,19 +125,47 @@ export function firePattern(
   threat: number,
   debug: DebugSettings,
   player: Phaser.GameObjects.Shape,
+  casts = 0,
 ): void {
   const baseAngle = Phaser.Math.Angle.Between(enemy.x, enemy.y, player.x, player.y);
   if (kind === "shooter") {
+    if (threat >= 10 && casts % 7 === 6) {
+      // Special 1: moving lane wall (forces side-step through narrow lanes)
+      const normal = baseAngle + Math.PI / 2;
+      for (let i = -4; i <= 4; i += 1) {
+        const offset = i * 20;
+        const ex = enemy.x + Math.cos(normal) * offset;
+        const ey = enemy.y + Math.sin(normal) * offset;
+        fireEnemyBullet(scene, enemyBullets, ex, ey, baseAngle, 176 + threat * 4, debug, { radiusScale: 1.18 });
+      }
+      return;
+    }
     const offsets = threat < 7 ? [0] : threat < 14 ? [-0.1, 0.1] : [-0.1, 0, 0.1];
     for (const offset of offsets) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + offset, 152 + threat * 6, debug);
     return;
   }
   if (kind === "spinner") {
+    if (threat >= 12 && casts % 6 === 5) {
+      // Special 2: dual rotating rings
+      const ringA = 9;
+      const ringB = 11;
+      const rot = casts * 0.22;
+      for (let i = 0; i < ringA; i += 1) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, rot + (Math.PI * 2 * i) / ringA, 132 + threat * 4, debug);
+      for (let i = 0; i < ringB; i += 1) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, -rot + (Math.PI * 2 * i) / ringB, 126 + threat * 4, debug, { radiusScale: 1.08 });
+      return;
+    }
     const count = threat < 8 ? 3 : Math.min(8, 3 + Math.floor(threat * 0.24));
     for (let i = 0; i < count; i += 1) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + (Math.PI * 2 * i) / count, 128 + threat * 6, debug);
     return;
   }
   if (kind === "bomber") {
+    if (threat >= 11 && casts % 6 === 3) {
+      // Special 3: heavy slow orbs (area denial)
+      for (const offset of [-0.26, 0, 0.26]) {
+        fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + offset, 104 + threat * 2, debug, { radiusScale: 1.95 });
+      }
+      return;
+    }
     for (const offset of [-0.42, -0.14, 0.14, 0.42]) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + offset, 144 + threat * 6, debug);
     return;
   }
@@ -145,11 +174,27 @@ export function firePattern(
     return;
   }
   if (kind === "mine") {
+    if (threat >= 12 && casts % 5 === 4) {
+      // Special 4: rotating cage
+      const petals = 10;
+      const spin = casts * 0.28;
+      for (let i = 0; i < petals; i += 1) {
+        fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, spin + (Math.PI * 2 * i) / petals, 118 + threat * 3, debug, { radiusScale: i % 2 === 0 ? 1.35 : 1 });
+      }
+      return;
+    }
     const petals = 6;
     for (let i = 0; i < petals; i += 1) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + (Math.PI * 2 * i) / petals, 112 + threat * 4, debug);
     return;
   }
   if (kind === "sniper") {
+    if (threat >= 14 && casts % 4 === 3) {
+      // Special 5: puncture shot with side blockers
+      fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle, 240 + threat * 5, debug, { radiusScale: 1.65 });
+      fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + 0.22, 172 + threat * 3, debug, { radiusScale: 1.15 });
+      fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle - 0.22, 172 + threat * 3, debug, { radiusScale: 1.15 });
+      return;
+    }
     fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle, 215 + threat * 4, debug);
     return;
   }
@@ -201,6 +246,7 @@ function createEnemy(
     hp: getEnemyHp(kind, threat, debug),
     speed: getEnemySpeed(kind, threat, debug),
     fireAt: elapsedMs + rng.between(700, 1700),
+    casts: 0,
   } satisfies EnemyData);
   enemy.setData("color", color);
   enemies.add(enemy);

@@ -36,6 +36,7 @@ export function fireEnemyBullet(
   angle: number,
   speed: number,
   debug: DebugSettings,
+  options?: { radiusScale?: number },
 ): boolean {
   if (group.countActive(true) >= MAX_ACTIVE_ENEMY_BULLETS) return false;
   const texture = getEnemyBulletTexture(angle);
@@ -44,7 +45,10 @@ export function fireEnemyBullet(
   const finalSpeed = speed * debug.enemyBulletSpeedMultiplier;
   const vx = Math.cos(angle) * finalSpeed;
   const vy = Math.sin(angle) * finalSpeed;
-  body.setCircle(ENEMY_BULLET_RADIUS).setAllowGravity(false).setVelocity(vx, vy);
+  const radiusScale = Phaser.Math.Clamp(options?.radiusScale ?? 1, 0.6, 3.2);
+  const radius = ENEMY_BULLET_RADIUS * radiusScale;
+  body.setCircle(radius).setAllowGravity(false).setVelocity(vx, vy);
+  bullet.setScale(radiusScale);
   bullet.setRotation(angle);
   bullet.setData("vx", vx);
   bullet.setData("vy", vy);
