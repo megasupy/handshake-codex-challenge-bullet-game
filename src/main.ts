@@ -114,6 +114,8 @@ const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
 const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
+const leaderboardModeEndless = mustGetButton("leaderboard-mode-endless");
+const leaderboardModeDaily = mustGetButton("leaderboard-mode-daily");
 const leaderboardRefresh = mustGetButton("leaderboard-refresh");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
@@ -150,6 +152,7 @@ const debugControls = {
 };
 
 let currentMode: GameMode = "endless";
+let leaderboardMode: GameMode = "endless";
 let lastRun: RunSummary | null = null;
 let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
@@ -213,7 +216,17 @@ copyLinkButton.addEventListener("click", async () => {
 });
 restartButton.addEventListener("click", () => startRun(currentMode));
 menuButton.addEventListener("click", showMenu);
-leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(currentMode));
+leaderboardRefresh.addEventListener("click", () => void refreshLeaderboard(leaderboardMode));
+leaderboardModeEndless.addEventListener("click", () => {
+  leaderboardMode = "endless";
+  renderLeaderboardModeButtons();
+  void refreshLeaderboard(leaderboardMode);
+});
+leaderboardModeDaily.addEventListener("click", () => {
+  leaderboardMode = "daily";
+  renderLeaderboardModeButtons();
+  void refreshLeaderboard(leaderboardMode);
+});
 submitButton.addEventListener("click", submitCurrentRun);
 debugToggle.addEventListener("click", () => debugPanel.classList.toggle("hidden"));
 debugClose.addEventListener("click", () => hide(debugPanel));
@@ -421,7 +434,8 @@ gameEvents.addEventListener("automation-snapshot", (event) => {
   publishAutomationResult(detail.run, false);
 });
 
-void refreshLeaderboard("endless");
+renderLeaderboardModeButtons();
+void refreshLeaderboard(leaderboardMode);
 renderProgressionPanel();
 renderRecordsPanel();
 renderRecentRunsPanel();
@@ -485,7 +499,7 @@ async function showMenu() {
   game.scene.stop("game");
   refreshCheckpointUi();
   refreshTutorialUi();
-  await refreshLeaderboard(currentMode);
+  await refreshLeaderboard(leaderboardMode);
 }
 
 function chooseUpgrade(id: string) {
@@ -589,13 +603,19 @@ async function submitCurrentRun() {
   submitButton.disabled = true;
   submitStatus.textContent = "Submitting...";
   const result = await submitRun(lastRun, playerNameInput.value);
-  renderLeaderboard(result);
+  if (lastRun.mode === leaderboardMode) renderLeaderboard(result);
+  else void refreshLeaderboard(leaderboardMode);
   renderRecentRunsPanel();
   submitStatus.textContent = result.error || `Submitted to ${result.source === "remote" ? "online" : "local"} leaderboard.`;
 }
 
 async function refreshLeaderboard(mode: GameMode) {
   renderLeaderboard(await getLeaderboard(mode));
+}
+
+function renderLeaderboardModeButtons() {
+  leaderboardModeEndless.className = leaderboardMode === "endless" ? "btn-primary px-3 py-2" : "btn-secondary px-3 py-2";
+  leaderboardModeDaily.className = leaderboardMode === "daily" ? "btn-primary px-3 py-2" : "btn-secondary px-3 py-2";
 }
 
 function renderLeaderboard(result: LeaderboardResult) {
