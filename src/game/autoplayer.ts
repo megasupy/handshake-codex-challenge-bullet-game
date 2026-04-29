@@ -341,11 +341,14 @@ export class Autoplayer {
       const closestY = bullet.y + vy * secondsToClosest;
       const closestDistance = Phaser.Math.Distance.Between(x, y, closestX, closestY);
       const currentDistance = Phaser.Math.Distance.Between(x, y, bullet.x, bullet.y);
-      const bulletRadius = 42;
+      const bodyRadius = Math.max(6, ((body.width || 0) + (body.height || 0)) * 0.25);
+      const bulletRadius = Math.max(34, bodyRadius * 2.6);
+      const warningRadius = bulletRadius + 72;
+      const nearRadius = bulletRadius + 28;
 
-      if (closestDistance < bulletRadius) risk += 340 + (bulletRadius - closestDistance) * 19;
-      else if (closestDistance < 110) risk += ((110 - closestDistance) / 110) * 62;
-      else if (currentDistance < 72) risk += ((72 - currentDistance) / 72) * 26;
+      if (closestDistance < bulletRadius) risk += 380 + (bulletRadius - closestDistance) * 22;
+      else if (closestDistance < warningRadius) risk += ((warningRadius - closestDistance) / warningRadius) * 72;
+      else if (currentDistance < nearRadius) risk += ((nearRadius - currentDistance) / nearRadius) * 34;
     }
 
     return risk;
@@ -447,9 +450,12 @@ export class Autoplayer {
       const px = player.x + moveVx * t;
       const py = player.y + moveVy * t;
       const dist = Phaser.Math.Distance.Between(px, py, cx, cy);
+      const bodyRadius = Math.max(6, ((body.width || 0) + (body.height || 0)) * 0.25);
+      const hitRadius = Math.max(28, bodyRadius * 2.2);
+      const warnRadius = hitRadius + 34;
 
-      if (dist < 34) risk += 230 + (34 - dist) * 20;
-      else if (dist < 76) risk += ((76 - dist) / 76) * 72;
+      if (dist < hitRadius) risk += 250 + (hitRadius - dist) * 22;
+      else if (dist < warnRadius) risk += ((warnRadius - dist) / warnRadius) * 82;
     }
     return risk;
   }
