@@ -35,6 +35,8 @@ export type CheckpointState = {
   activeBossStartedAt: number | null;
   playerShotsFired: number;
   playerShotsHit: number;
+  upgradesTaken: number;
+  bossesDefeated: number;
   debug: DebugSettings;
   stats: PlayerStats;
   initialProgression: ProgressionState | null;

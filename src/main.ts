@@ -50,6 +50,7 @@ const progressionUpgrades = mustGet("progression-upgrades");
 const progressionReset = mustGetButton("progression-reset");
 const upgradeScreen = mustGet("upgrade-screen");
 const gameOver = mustGet("game-over");
+const runSummary = mustGet("run-summary");
 const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
 const playButton = mustGetButton("play-button");
@@ -178,6 +179,7 @@ gameEvents.addEventListener("game-over", (event) => {
   text("final-time", `${(lastRun.survivalMs / 1000).toFixed(1)}s`);
   text("final-kills", `${lastRun.kills} kills`);
   text("final-threat", `Threat ${lastRun.maxThreatLevel}`);
+  renderRunSummary(lastRun);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
   renderProgressionPanel();
@@ -244,7 +246,7 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
   game.scene.start("game", {
     mode,
     seed: checkpoint?.seed || automationConfig.seed || (mode === "daily" ? dailySeed() : Date.now().toString(36)),
-    debugSettings: getDebugSettingsFromControls(),
+    debugSettings: checkpoint?.debug || getDebugSettingsFromControls(),
     startMs: automationConfig.startMs,
     telemetryConfig: checkpoint?.telemetryConfig || getTelemetryConfig(),
     progression: currentProgression,
@@ -436,6 +438,31 @@ function renderProgressionPanel() {
       });
     }
     progressionUpgrades.append(button);
+  }
+}
+
+function renderRunSummary(run: RunSummary) {
+  runSummary.innerHTML = "";
+  const rows: Record<string, string | number> = {
+    damage: run.playerDamage ?? 1,
+    projectiles: run.playerProjectiles ?? 1,
+    fireRate: `${run.playerFireRate ?? 0}ms`,
+    pierce: run.playerPierce ?? 0,
+    projectileSpeed: run.playerProjectileSpeed ?? 0,
+    shots: run.shotsFired ?? 0,
+    accuracy: `${((run.shotAccuracy ?? 0) * 100).toFixed(0)}%`,
+    upgrades: run.upgradesTaken ?? 0,
+    bosses: run.bossesDefeated ?? 0,
+    maxHp: run.maxHealth ?? 0,
+    moveSpeed: run.speed ?? 0,
+    threatPeak: run.finalThreat ?? run.maxThreatLevel,
+  };
+
+  for (const [label, value] of Object.entries(rows)) {
+    const item = document.createElement("div");
+    item.className = "debug-stat";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    runSummary.append(item);
   }
 }
 

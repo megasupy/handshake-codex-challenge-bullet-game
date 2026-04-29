@@ -19,4 +19,18 @@ export type LeaderboardResult = {
   error?: string;
 };
 
-export type RunSummary = Omit<RunRecord, "id" | "playerName" | "createdAt" | "synced">;
+export type RunSummary = Omit<RunRecord, "id" | "playerName" | "createdAt" | "synced"> & {
+  playerDamage?: number;
+  playerProjectiles?: number;
+  playerFireRate?: number;
+  playerPierce?: number;
+  playerProjectileSpeed?: number;
+  shotsFired?: number;
+  shotsHit?: number;
+  shotAccuracy?: number;
+  upgradesTaken?: number;
+  bossesDefeated?: number;
+  maxHealth?: number;
+  speed?: number;
+  finalThreat?: number;
+};

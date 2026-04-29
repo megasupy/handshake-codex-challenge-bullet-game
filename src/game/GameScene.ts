@@ -62,6 +62,8 @@ export class GameScene extends Phaser.Scene {
   private resumeCheckpoint: CheckpointState | null = null;
   private playerShotsFired = 0;
   private playerShotsHit = 0;
+  private upgradesTaken = 0;
+  private bossesDefeated = 0;
   private checkpointSaveAt = 0;
   private runEnded = false;
 
@@ -231,6 +233,8 @@ export class GameScene extends Phaser.Scene {
     this.activeBossStartedAt = null;
     this.playerShotsFired = 0;
     this.playerShotsHit = 0;
+    this.upgradesTaken = 0;
+    this.bossesDefeated = 0;
     this.checkpointSaveAt = 2000;
     this.runEnded = false;
     this.stats = this.initialProgression ? applyProgression({ ...DEFAULT_PLAYER_STATS }, this.initialProgression) : { ...DEFAULT_PLAYER_STATS };
@@ -491,6 +495,7 @@ export class GameScene extends Phaser.Scene {
     this.boss = null;
     this.activeBossStartedAt = null;
     this.score += 250;
+    this.bossesDefeated += 1;
     if (this.finalApexActive) {
       this.nextBossAt = Number.POSITIVE_INFINITY;
       this.finalApexActive = false;
@@ -642,6 +647,19 @@ export class GameScene extends Phaser.Scene {
       maxThreatLevel: this.maxThreatLevel,
       seed: this.seed,
       mode: this.mode,
+      playerDamage: this.stats.damage,
+      playerProjectiles: this.stats.projectiles,
+      playerFireRate: this.stats.fireRate,
+      playerPierce: this.stats.pierce,
+      playerProjectileSpeed: this.stats.projectileSpeed,
+      shotsFired: this.playerShotsFired,
+      shotsHit: this.playerShotsHit,
+      shotAccuracy: this.playerShotsFired > 0 ? Math.round((this.playerShotsHit / this.playerShotsFired) * 100) / 100 : 0,
+      upgradesTaken: this.upgradesTaken,
+      bossesDefeated: this.bossesDefeated,
+      maxHealth: this.health,
+      speed: this.stats.speed,
+      finalThreat: this.getThreatLevel(),
     };
 
     this.scene.pause();
@@ -759,6 +777,7 @@ export class GameScene extends Phaser.Scene {
     const result = applyUpgradeToStats(this.stats, this.health, id);
     this.stats = result.stats;
     this.health = result.health;
+    this.upgradesTaken += 1;
     this.nextUpgradeAt += UPGRADE_INTERVAL_MS;
     this.telemetry?.logEvent(this.elapsedMs, "upgrade-picked", {
       id,
@@ -806,6 +825,8 @@ export class GameScene extends Phaser.Scene {
       activeBossStartedAt: this.activeBossStartedAt,
       playerShotsFired: this.playerShotsFired,
       playerShotsHit: this.playerShotsHit,
+      upgradesTaken: this.upgradesTaken,
+      bossesDefeated: this.bossesDefeated,
       debug: { ...this.debug },
       stats: { ...this.stats },
       initialProgression: this.initialProgression ? { ...this.initialProgression, upgrades: { ...this.initialProgression.upgrades } } : null,
@@ -917,8 +938,10 @@ export class GameScene extends Phaser.Scene {
     this.finalApexActive = checkpoint.finalApexActive;
     this.maxThreatLevel = checkpoint.maxThreatLevel;
     this.activeBossStartedAt = checkpoint.activeBossStartedAt;
-    this.playerShotsFired = checkpoint.playerShotsFired;
-    this.playerShotsHit = checkpoint.playerShotsHit;
+    this.playerShotsFired = checkpoint.playerShotsFired ?? 0;
+    this.playerShotsHit = checkpoint.playerShotsHit ?? 0;
+    this.upgradesTaken = checkpoint.upgradesTaken ?? 0;
+    this.bossesDefeated = checkpoint.bossesDefeated ?? 0;
     this.debug = mergeDebugSettings({ ...DEFAULT_DEBUG_SETTINGS }, checkpoint.debug);
     this.stats = { ...checkpoint.stats };
     this.initialProgression = checkpoint.initialProgression ? { ...checkpoint.initialProgression, upgrades: { ...checkpoint.initialProgression.upgrades } } : null;
