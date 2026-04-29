@@ -12,6 +12,7 @@ import { exportProfileBackup, importProfileBackup } from "./services/profileBack
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
 import { clearTelemetryArchive, formatTelemetryArchiveEntry, readTelemetryArchive, saveTelemetryRun, type TelemetryArchiveEntry } from "./services/telemetryArchive";
 import { formatPreferencesSummary, readPreferences, updatePreferences, type PreferencesState } from "./services/preferences";
+import { applySettingsPreset, formatSettingsPresetSummary, readSelectedSettingsPreset, SETTINGS_PRESETS, type SettingsPresetId, writeSelectedSettingsPreset } from "./services/settingsPresets";
 import { formatRecordsSummary, readRecords, updateRecords, type RecordsState } from "./services/records";
 import { formatAchievementsSummary, listAchievements, readAchievements, updateAchievements, type AchievementState } from "./services/achievements";
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
@@ -68,6 +69,8 @@ const syncStatusSummary = mustGet("sync-status-summary");
 const syncStatusStats = mustGet("sync-status-stats");
 const syncNowButton = mustGetButton("sync-now-button");
 const preferencesSummary = mustGet("preferences-summary");
+const settingsPresetSummary = mustGet("settings-preset-summary");
+const settingsPresetList = mustGet("settings-preset-list");
 const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
 const prefsScreenShake = mustGetInput("prefs-screen-shake");
@@ -149,6 +152,7 @@ let lastRun: RunSummary | null = null;
 let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
 let currentPreferences: PreferencesState = readPreferences();
+let currentSettingsPreset: SettingsPresetId = readSelectedSettingsPreset();
 let currentRecords: RecordsState = readRecords();
 let currentAchievements: AchievementState = readAchievements();
 let currentKeybinds: KeybindState = readKeybinds();
@@ -162,6 +166,7 @@ playerNameInput.value = getSavedName();
 debugControls.autoplayer.checked = automationConfig.autoplayer || localStorage.getItem(AUTOPLAYER_KEY) === "true";
 if (automationConfig.timeScale !== null) debugControls.timeScale.value = automationConfig.timeScale.toString();
 applyPreferencesToUi(currentPreferences);
+renderSettingsPresetPanel();
 renderFullscreenUi();
 tutorialDontShow.checked = !currentTutorial.seen;
 renderKeybindsPanel();
@@ -751,7 +756,10 @@ function applyPreferenceControls() {
     screenShake: prefsScreenShake.checked,
     reducedMotion: prefsReducedMotion.checked,
   });
+  currentSettingsPreset = "custom";
+  writeSelectedSettingsPreset("custom");
   applyPreferencesToUi(currentPreferences);
+  renderSettingsPresetPanel();
 }
 
 function applyPreferencesToUi(state: PreferencesState) {
@@ -760,6 +768,44 @@ function applyPreferencesToUi(state: PreferencesState) {
   prefsScreenShake.checked = state.screenShake;
   prefsReducedMotion.checked = state.reducedMotion;
   preferencesSummary.textContent = formatPreferencesSummary(state);
+}
+
+function renderSettingsPresetPanel() {
+  settingsPresetSummary.textContent = formatSettingsPresetSummary(currentSettingsPreset, currentPreferences);
+  settingsPresetList.innerHTML = "";
+
+  const buttons: Array<{ id: SettingsPresetId; label: string; active: boolean }> = [
+    ...SETTINGS_PRESETS.map((preset) => ({
+      id: preset.id,
+      label: preset.title,
+      active: currentSettingsPreset === preset.id,
+    })),
+    {
+      id: "custom",
+      label: "Custom",
+      active: currentSettingsPreset === "custom",
+    },
+  ];
+
+  for (const item of buttons) {
+    const button = document.createElement("button");
+    button.className = item.active ? "btn-primary px-3 py-2 text-left" : "btn-secondary px-3 py-2 text-left";
+    button.textContent = item.label;
+    button.addEventListener("click", () => {
+      if (item.id === "custom") {
+        currentSettingsPreset = "custom";
+        writeSelectedSettingsPreset("custom");
+        renderSettingsPresetPanel();
+        return;
+      }
+      currentPreferences = applySettingsPreset(item.id);
+      currentSettingsPreset = item.id;
+      applyPreferencesToUi(currentPreferences);
+      renderSettingsPresetPanel();
+      profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
+    });
+    settingsPresetList.append(button);
+  }
 }
 
 async function toggleFullscreen() {
@@ -943,6 +989,7 @@ function resetAllLocalData() {
 
   currentProgression = readProgression();
   currentPreferences = readPreferences();
+  currentSettingsPreset = readSelectedSettingsPreset();
   currentRecords = readRecords();
   currentAchievements = readAchievements();
   currentKeybinds = readKeybinds();
@@ -950,6 +997,7 @@ function resetAllLocalData() {
   currentTutorial = readTutorialState();
   playerNameInput.value = getSavedName();
   applyPreferencesToUi(currentPreferences);
+  renderSettingsPresetPanel();
   renderProgressionPanel();
   renderRecordsPanel();
   renderRecentRunsPanel();
@@ -975,6 +1023,7 @@ function shouldAutoPause(): boolean {
 function syncProfileFromStorage() {
   currentProgression = readProgression();
   currentPreferences = readPreferences();
+  currentSettingsPreset = readSelectedSettingsPreset();
   currentRecords = readRecords();
   currentAchievements = readAchievements();
   currentKeybinds = readKeybinds();
@@ -982,6 +1031,7 @@ function syncProfileFromStorage() {
   currentTelemetryArchive = readTelemetryArchive();
   playerNameInput.value = getSavedName();
   applyPreferencesToUi(currentPreferences);
+  renderSettingsPresetPanel();
   renderProgressionPanel();
   renderRecordsPanel();
   renderRecentRunsPanel();

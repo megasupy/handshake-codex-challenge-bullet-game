@@ -3,6 +3,7 @@ import type { CheckpointState } from "./checkpoint";
 import { clearCheckpoint, writeCheckpoint } from "./checkpoint";
 import { readRuns, saveName, writeRuns } from "./localRuns";
 import { readPreferences, writePreferences, type PreferencesState } from "./preferences";
+import { readSelectedSettingsPreset, writeSelectedSettingsPreset, type SettingsPresetId } from "./settingsPresets";
 import { readProgression, writeProgression, type ProgressionState } from "./progression";
 import { readRecords, writeRecords, type RecordsState } from "./records";
 import { readAchievements, writeAchievements, type AchievementState } from "./achievements";
@@ -18,6 +19,7 @@ export type ProfileBackup = {
   playerName: string;
   progression: ProgressionState;
   preferences: PreferencesState;
+  settingsPreset: SettingsPresetId;
   records: RecordsState;
   achievements: AchievementState;
   tutorial: TutorialState;
@@ -34,6 +36,7 @@ export function exportProfileBackup(): ProfileBackup {
     playerName: localStorage.getItem("storm_player_name_v1") || "",
     progression: readProgression(),
     preferences: readPreferences(),
+    settingsPreset: readSelectedSettingsPreset(),
     records: readRecords(),
     achievements: readAchievements(),
     tutorial: readTutorialState(),
@@ -54,6 +57,7 @@ export function importProfileBackup(raw: string): { ok: boolean; error?: string 
     if (parsed.playerName !== undefined) saveName(String(parsed.playerName));
     if (parsed.progression) writeProgression(parsed.progression);
     if (parsed.preferences) writePreferences(parsed.preferences);
+    if (parsed.settingsPreset) writeSelectedSettingsPreset(parsed.settingsPreset);
     if (parsed.records) writeRecords(parsed.records);
     if (parsed.achievements) writeAchievements(parsed.achievements);
     if (parsed.tutorial) markTutorialSeen(parsed.tutorial.seen);
