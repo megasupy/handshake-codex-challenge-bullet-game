@@ -208,6 +208,7 @@ let currentLeaderboardRows: RunRecord[] = [];
 let selectedRecentRun: RunRecord | null = null;
 let selectedBoardRun: RunRecord | null = null;
 let telemetryFilterValue = "";
+let selectedTelemetryRunId: string | null = null;
 let runSearchValue = "";
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
@@ -429,10 +430,20 @@ telemetryArchiveDownload.addEventListener("click", downloadLatestTelemetryLog);
 telemetryArchiveClear.addEventListener("click", () => {
   clearTelemetryArchive();
   currentTelemetryArchive = [];
+  selectedTelemetryRunId = null;
   renderTelemetryArchive();
   renderTelemetryTimeline();
   renderRunFeed();
   showToast("Telemetry archive cleared.", "success");
+});
+telemetryArchiveList.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const item = target.closest("[data-telemetry-run-id]") as HTMLElement | null;
+  if (!item) return;
+  selectedTelemetryRunId = item.dataset.telemetryRunId || null;
+  renderTelemetryArchive();
+  renderTelemetryTimeline();
+  renderRunFeed();
 });
 telemetryFilter.addEventListener("input", () => {
   telemetryFilterValue = telemetryFilter.value.trim().toLowerCase();
@@ -1354,9 +1365,10 @@ function renderTelemetryArchive() {
   const entries = telemetryFilterValue
     ? currentTelemetryArchive.filter((entry) => matchesTelemetryEntry(entry, telemetryFilterValue))
     : currentTelemetryArchive;
+  const selected = getSelectedTelemetryEntry(entries);
   telemetryArchiveCount.textContent = `${entries.length} log${entries.length === 1 ? "" : "s"}`;
   telemetryArchiveSummary.textContent = entries.length > 0
-    ? `${formatTelemetryArchiveEntry(entries[0])}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`
+    ? `${formatTelemetryArchiveEntry(selected || entries[0])}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`
     : "The latest completed telemetry run is saved locally for review.";
   telemetryArchiveList.innerHTML = "";
 
@@ -1370,7 +1382,11 @@ function renderTelemetryArchive() {
 
   entries.slice(0, 3).forEach((entry) => {
     const item = document.createElement("li");
-    item.className = "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-300";
+    const selected = selectedTelemetryRunId === entry.runId;
+    item.className = selected
+      ? "rounded-md border border-pulse bg-slate-900/90 px-3 py-3 text-sm text-slate-100"
+      : "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-300";
+    item.dataset.telemetryRunId = entry.runId;
     item.innerHTML = `
       <strong class="block truncate text-white">${escapeHtml(entry.runId)}</strong>
       <span class="mt-1 block text-xs leading-5 text-slate-400">${escapeHtml(formatTelemetryArchiveEntry(entry))}</span>
@@ -1380,9 +1396,10 @@ function renderTelemetryArchive() {
 }
 
 function renderTelemetryTimeline() {
-  const entry = telemetryFilterValue
-    ? currentTelemetryArchive.find((item) => matchesTelemetryEntry(item, telemetryFilterValue))
-    : currentTelemetryArchive[0];
+  const entries = telemetryFilterValue
+    ? currentTelemetryArchive.filter((item) => matchesTelemetryEntry(item, telemetryFilterValue))
+    : currentTelemetryArchive;
+  const entry = getSelectedTelemetryEntry(entries);
   if (!entry) {
     telemetryTimelineCount.textContent = "0 lines";
     telemetryTimelineSummary.textContent = "The latest telemetry run is summarized into readable snapshots.";
@@ -1396,7 +1413,7 @@ function renderTelemetryTimeline() {
     .filter((line) => (line.includes("SNAP") || line.includes("EVENT")) && (!telemetryFilterValue || line.toLowerCase().includes(telemetryFilterValue)));
   const slice = lines.slice(-6);
   telemetryTimelineCount.textContent = `${slice.length} lines`;
-  telemetryTimelineSummary.textContent = `Latest run: ${formatTelemetryArchiveEntry(entry)}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`;
+  telemetryTimelineSummary.textContent = `${selectedTelemetryRunId === entry.runId ? "Selected run" : "Latest run"}: ${formatTelemetryArchiveEntry(entry)}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`;
   telemetryTimelineList.innerHTML = "";
 
   if (slice.length === 0) {
@@ -1416,9 +1433,10 @@ function renderTelemetryTimeline() {
 }
 
 function renderRunFeed() {
-  const entry = telemetryFilterValue
-    ? currentTelemetryArchive.find((item) => matchesTelemetryEntry(item, telemetryFilterValue))
-    : currentTelemetryArchive[0];
+  const entries = telemetryFilterValue
+    ? currentTelemetryArchive.filter((item) => matchesTelemetryEntry(item, telemetryFilterValue))
+    : currentTelemetryArchive;
+  const entry = getSelectedTelemetryEntry(entries);
   if (!entry) {
     runFeedCount.textContent = "0 events";
     runFeedSummary.textContent = "Major run milestones from the latest saved telemetry log.";
@@ -1435,7 +1453,7 @@ function renderRunFeed() {
 
   const slice = events.slice(-8);
   runFeedCount.textContent = `${slice.length} event${slice.length === 1 ? "" : "s"}`;
-  runFeedSummary.textContent = `Latest run: ${formatTelemetryArchiveEntry(entry)}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`;
+  runFeedSummary.textContent = `${selectedTelemetryRunId === entry.runId ? "Selected run" : "Latest run"}: ${formatTelemetryArchiveEntry(entry)}${telemetryFilterValue ? ` · filter "${telemetryFilterValue}"` : ""}`;
   runFeedList.innerHTML = "";
 
   if (slice.length === 0) {
@@ -1461,6 +1479,16 @@ function matchesTelemetryEntry(entry: TelemetryArchiveEntry, filter: string): bo
     || entry.mode.toLowerCase().includes(filter)
     || entry.logText.toLowerCase().includes(filter)
     || Object.entries(entry.summary || {}).some(([key, value]) => `${key} ${value}`.toLowerCase().includes(filter));
+}
+
+function getSelectedTelemetryEntry(entries: TelemetryArchiveEntry[]): TelemetryArchiveEntry | null {
+  if (entries.length === 0) return null;
+  if (selectedTelemetryRunId) {
+    const selected = entries.find((entry) => entry.runId === selectedTelemetryRunId);
+    if (selected) return selected;
+  }
+  selectedTelemetryRunId = entries[0].runId;
+  return entries[0];
 }
 
 function formatTelemetryEventLine(line: string): string | null {
@@ -1548,6 +1576,7 @@ function resetAllLocalData() {
   currentKeybinds = readKeybinds();
   currentTelemetryArchive = readTelemetryArchive();
   currentTutorial = readTutorialState();
+  selectedTelemetryRunId = null;
   playerNameInput.value = getSavedName();
   applyPreferencesToUi(currentPreferences);
   renderSettingsPresetPanel();
