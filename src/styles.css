@@ -99,4 +99,13 @@
   #menu > aside.panel {
     @apply max-w-[min(100%,28rem)];
   }
+
+  #menu-tabs-panel {
+    @apply sticky top-0 z-30 border-pulse/30 bg-panel/95 shadow-xl max-h-none overflow-visible;
+  }
+
+  #menu-tab-nav .btn-primary,
+  #menu-tab-nav .btn-secondary {
+    @apply text-xs sm:text-sm;
+  }
 }

@@ -918,7 +918,7 @@ async function showMenu() {
   hideHud();
   hideBossHud();
   runPaused = false;
-  setMenuTab("home");
+  renderMenuTabs();
   show(menu);
   renderProgressionPanel();
   game.scene.stop("game");
@@ -2165,6 +2165,7 @@ function resetAllLocalData() {
   runTagFilterValue = "";
   runCompareValue = "best";
   runSortValue = "best";
+  currentMenuTab = "home";
   playerNameInput.value = getSavedName();
   telemetryFilter.value = "";
   runSearch.value = "";
@@ -2186,6 +2187,7 @@ function resetAllLocalData() {
   refreshTutorialUi();
   renderKeybindsPanel();
   renderRunTagFilterUi();
+  renderMenuTabs();
   refreshCheckpointUi();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
   renderBackupSavedAt(new Date().toISOString());
@@ -2214,6 +2216,7 @@ function syncProfileFromStorage() {
   runTagFilterValue = readStoredText(RUN_TAG_FILTER_KEY);
   runCompareValue = readStoredText(RUN_COMPARE_KEY);
   runSortValue = readStoredText(RUN_SORT_KEY) || "best";
+  currentMenuTab = normalizeMenuTab(readStoredText(MENU_TAB_KEY) || "home");
   selectedTelemetryRunId = null;
   playerNameInput.value = getSavedName();
   telemetryFilter.value = telemetryFilterValue;
@@ -2235,6 +2238,7 @@ function syncProfileFromStorage() {
   renderKeybindsPanel();
   renderRunTagFilterUi();
   renderRunCompareUi();
+  renderMenuTabs();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
   renderBackupSavedAt(new Date().toISOString());
 }

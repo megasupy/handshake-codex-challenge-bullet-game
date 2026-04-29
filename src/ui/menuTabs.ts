@@ -8,7 +8,8 @@ export function normalizeMenuTab(tab: string): MenuTab {
 
 export function renderMenuTabs(panels: HTMLElement[], buttons: HTMLButtonElement[], activeTab: MenuTab): void {
   for (const panel of panels) {
-    panel.classList.toggle("hidden", panel.dataset.menuTab !== activeTab);
+    const tab = panel.dataset.menuTab;
+    panel.classList.toggle("hidden", tab !== "all" && tab !== activeTab);
   }
   for (const button of buttons) {
     const active = button.dataset.menuTabButton === activeTab;
