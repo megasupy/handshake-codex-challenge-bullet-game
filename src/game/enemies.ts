@@ -32,11 +32,11 @@ export function spawnEnemyIfReady(args: {
   if (args.elapsedMs < args.spawnAt) return args.spawnAt;
   if (args.enemies.countActive(true) >= args.debug.enemyCap) return args.elapsedMs + 250;
 
-  const interval = Math.max(140, (1260 / Math.log2(args.threat + 2)) * args.debug.spawnMultiplier);
+  const interval = Math.max(120, (1080 / Math.log2(args.threat + 2)) * args.debug.spawnMultiplier);
   const kind = chooseEnemyKind(args.elapsedMs, args.rng);
 
   createEnemy(args.scene, args.enemies, args.rng, kind, args.threat, args.elapsedMs, args.debug, args.player.x, args.player.y);
-  if (args.threat > 7 && args.rng.frac() > 0.28) {
+  if (args.threat > 6 && args.rng.frac() > 0.42) {
     createEnemy(args.scene, args.enemies, args.rng, "chaser", args.threat, args.elapsedMs, args.debug, args.player.x, args.player.y);
   }
   return args.elapsedMs + interval;
@@ -60,7 +60,7 @@ export function updateEnemies(args: {
 
     if (args.elapsedMs >= data.fireAt && data.kind !== "chaser") {
       firePattern(args.scene, args.enemyBullets, enemy, data.kind, args.threat, args.debug, args.player);
-      data.fireAt = args.elapsedMs + Math.max(650, (2450 - args.threat * 70) * args.debug.enemyFireRateMultiplier);
+      data.fireAt = args.elapsedMs + Math.max(540, (2200 - args.threat * 72) * args.debug.enemyFireRateMultiplier);
     }
 
     return true;
@@ -80,17 +80,17 @@ export function firePattern(
   if (kind === "shooter") {
     const spread = threat >= 9 ? 0.16 : 0;
     const shots = threat >= 9 ? [-1, 1] : [0];
-    for (const i of shots) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + i * spread, 150 + threat * 8, debug);
+    for (const i of shots) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + i * spread, 165 + threat * 9, debug);
   }
   if (kind === "spinner") {
     const count = Math.min(7, 2 + Math.floor(threat * 0.42));
     for (let i = 0; i < count; i += 1) {
-      fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + (Math.PI * 2 * i) / count, 120 + threat * 7, debug);
+      fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + (Math.PI * 2 * i) / count, 132 + threat * 7, debug);
     }
   }
   if (kind === "bomber") {
     const count = threat >= 9 ? 4 : 2;
-    for (let i = 0; i < count; i += 1) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + i * 0.58, 135 + threat * 6, debug);
+    for (let i = 0; i < count; i += 1) fireEnemyBullet(scene, enemyBullets, enemy.x, enemy.y, baseAngle + i * 0.58, 148 + threat * 7, debug);
   }
 }
 
@@ -135,7 +135,7 @@ function createEnemy(
   body.setCircle(radius).setCollideWorldBounds(true);
   enemy.setData("enemy", {
     kind,
-    hp: Math.ceil((kind === "spinner" ? 4 + threat : kind === "bomber" ? 3 + threat : 2 + Math.floor(threat / 2)) * debug.enemyHealthMultiplier),
+    hp: Math.ceil((kind === "spinner" ? 4 + threat : kind === "bomber" ? 3 + threat : 2 + Math.floor(threat / 2)) * 1.25 * debug.enemyHealthMultiplier),
     speed: (kind === "chaser" ? 88 + threat * 6 : kind === "bomber" ? 70 + threat * 5 : 36 + threat * 2) * debug.enemySpeedMultiplier,
     fireAt: elapsedMs + rng.between(900, 1800),
   } satisfies EnemyData);

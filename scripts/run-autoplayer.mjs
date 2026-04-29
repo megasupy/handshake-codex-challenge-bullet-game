@@ -25,6 +25,7 @@ await mkdir(summaryDir, { recursive: true });
 
 const port = await findAvailablePort(basePort);
 process.stdout.write(`using port ${port}\n`);
+process.stdout.write(`config runs=${runs} maxMs=${maxMs} timeScale=${timeScale} sampleMs=${sampleMs} snapshotMs=${snapshotMs} headful=${headful ? 1 : 0}\n`);
 
 const server = spawn("npm", ["exec", "vite", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
   stdio: ["ignore", "pipe", "pipe"],
@@ -55,7 +56,9 @@ try {
     url.searchParams.set("timeScale", String(timeScale));
     if (startMs > 0) url.searchParams.set("startMs", String(startMs));
 
-    const budgetMs = Math.ceil(maxMs / Math.max(0.1, timeScale)) + 12000;
+    const scaledBudgetMs = Math.ceil(maxMs / Math.max(0.1, timeScale));
+    const budgetMs = scaledBudgetMs + Math.max(30000, Math.ceil(maxMs * 0.2));
+    process.stdout.write(`run ${i + 1}/${runs} seed=${seed} budgetMs=${budgetMs}\n`);
     const run = await runChromium(url.toString(), budgetMs, debugBasePort + i * 2);
     const filePath = new URL(`../logs/runs/${runId}.json`, import.meta.url);
     await writeFile(filePath, `${JSON.stringify(run, null, 2)}\n`);

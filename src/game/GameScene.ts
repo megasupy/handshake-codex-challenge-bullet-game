@@ -295,6 +295,7 @@ export class GameScene extends Phaser.Scene {
       enemyBullets: this.enemyBullets,
       pickups: this.pickups,
       speed,
+      timeScale: this.debug.timeScale,
     });
   }
 
@@ -308,6 +309,7 @@ export class GameScene extends Phaser.Scene {
       enemies: this.enemies,
       enemyBullets: this.enemyBullets,
       dashSpeed,
+      timeScale: this.debug.timeScale,
     });
   }
 

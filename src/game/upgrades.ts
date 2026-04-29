@@ -93,8 +93,8 @@ function getAutoplayerUpgradeScore(id: string, stats: PlayerStats, health: numbe
     damage: weakness.damage * 1.1 + needsThroughput * 0.18,
     "heavy-damage": weakness.damage * 0.95 + needsThroughput * 0.2,
     rate: weakness.fireRate + needsThroughput * 0.36,
-    projectile: weakness.projectiles + needsThroughput * 0.65,
-    volley: weakness.projectiles * 0.92 + needsThroughput * 0.72,
+    projectile: weakness.projectiles + 0.18 + needsThroughput * 0.65,
+    volley: weakness.projectiles * 0.92 + 0.2 + needsThroughput * 0.72,
     pierce: weakness.pierce * 0.8 + needsThroughput * 0.2,
     velocity: weakness.velocity * 0.75,
     speed: weakness.speed,
@@ -103,7 +103,7 @@ function getAutoplayerUpgradeScore(id: string, stats: PlayerStats, health: numbe
     heal: missingHealth > 0 ? 1.2 + missingHealth * 0.25 : 0.05,
     range: weakness.utility * 0.75,
     "wide-range": weakness.utility * 0.65,
-    dash: weakness.dash * 0.7,
+    dash: weakness.dash * 0.5,
   };
 
   return scores[id] ?? 0;

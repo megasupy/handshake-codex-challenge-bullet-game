@@ -35,18 +35,20 @@ export class Autoplayer {
     enemyBullets: Phaser.Physics.Arcade.Group;
     pickups: Phaser.Physics.Arcade.Group;
     speed: number;
+    timeScale: number;
   }): Phaser.Math.Vector2 {
     if (args.elapsedMs < this.nextDecisionAt) return this.direction.clone();
 
     const startedAt = performance.now();
-    const horizons = [0.14, 0.3, 0.5, 0.75, 1.05];
+    const scale = Math.max(0.1, args.timeScale);
+    const horizons = [0.14, 0.3, 0.5, 0.75, 1.05].map((value) => value / scale);
     const activeBulletCount = args.enemyBullets.countActive(true);
     const activeEnemyCount = args.enemies.countActive(true);
-    const pickupTarget = this.choosePickupTarget(args.player, args.pickups, args.enemyBullets, args.enemies);
+    const pickupTarget = this.choosePickupTarget(args.player, args.pickups, args.enemyBullets, args.enemies, scale);
     const directPickupDirection = pickupTarget
       ? new Phaser.Math.Vector2(pickupTarget.x - args.player.x, pickupTarget.y - args.player.y).normalize()
       : null;
-    const currentDanger = this.getHazardScoreAt(args.player.x, args.player.y, args.enemies, args.enemyBullets, args.player);
+    const currentDanger = this.getHazardScoreAt(args.player.x, args.player.y, args.enemies, args.enemyBullets, args.player, scale);
     const nearestEnemyDistance = this.getNearestEnemyDistance(args.player.x, args.player.y, args.enemies);
     const nearestPickupDistance = pickupTarget ? Phaser.Math.Distance.Between(args.player.x, args.player.y, pickupTarget.x, pickupTarget.y) : Number.POSITIVE_INFINITY;
     const prioritizeSurvival = currentDanger >= 1.8 || activeBulletCount >= 8 || activeEnemyCount >= 8;
@@ -55,7 +57,7 @@ export class Autoplayer {
     if (
       pickupTarget &&
       directPickupDirection &&
-      this.shouldMoveDirectlyToPickup(args.player, pickupTarget, args.enemies, args.enemyBullets) &&
+      this.shouldMoveDirectlyToPickup(args.player, pickupTarget, args.enemies, args.enemyBullets, scale) &&
       activeBulletCount < 10 &&
       activeEnemyCount < 9 &&
       !prioritizeSurvival
@@ -74,7 +76,7 @@ export class Autoplayer {
         const weight = horizon < 0.2 ? 2.1 : horizon < 0.55 ? 1.35 : 0.72;
         const x = Phaser.Math.Clamp(args.player.x + direction.x * args.speed * horizon, 22, ARENA_WIDTH - 22);
         const y = Phaser.Math.Clamp(args.player.y + direction.y * args.speed * horizon, 22, ARENA_HEIGHT - 22);
-        score += this.scorePosition(x, y, horizon, args.enemies, args.enemyBullets, activePickupTarget, args.player) * weight;
+        score += this.scorePosition(x, y, horizon, args.enemies, args.enemyBullets, activePickupTarget, args.player, scale) * weight;
       }
 
       if (direction.lengthSq() > 0 && direction.dot(this.direction) < -0.25) {
@@ -84,7 +86,7 @@ export class Autoplayer {
         if (nearestEnemyDistance < 240) score += 36;
         else if (activeEnemyCount > 4) score += 14;
       }
-      if (activePickupTarget && direction.lengthSq() === 0 && this.getHazardScoreAt(args.player.x, args.player.y, args.enemies, args.enemyBullets, args.player) < 2.5) {
+      if (activePickupTarget && direction.lengthSq() === 0 && this.getHazardScoreAt(args.player.x, args.player.y, args.enemies, args.enemyBullets, args.player, scale) < 2.5) {
         score += 8;
       }
       if (activePickupTarget && directPickupDirection && direction.lengthSq() > 0) {
@@ -99,9 +101,10 @@ export class Autoplayer {
     }
 
     this.direction.copy(bestDirection.lengthSq() > 0 ? bestDirection.clone().normalize() : Phaser.Math.Vector2.ZERO);
-    const projectedX = Phaser.Math.Clamp(args.player.x + this.direction.x * args.speed * 0.28, 22, ARENA_WIDTH - 22);
-    const projectedY = Phaser.Math.Clamp(args.player.y + this.direction.y * args.speed * 0.28, 22, ARENA_HEIGHT - 22);
-    const projectedDanger = this.getHazardScoreAt(projectedX, projectedY, args.enemies, args.enemyBullets, args.player);
+    const projectedHorizon = 0.28 / scale;
+    const projectedX = Phaser.Math.Clamp(args.player.x + this.direction.x * args.speed * projectedHorizon, 22, ARENA_WIDTH - 22);
+    const projectedY = Phaser.Math.Clamp(args.player.y + this.direction.y * args.speed * projectedHorizon, 22, ARENA_HEIGHT - 22);
+    const projectedDanger = this.getHazardScoreAt(projectedX, projectedY, args.enemies, args.enemyBullets, args.player, scale);
     this.finishDecision(activePickupTarget ? "scored-pickup" : "scored-survival", currentDanger, projectedDanger, nearestPickupDistance, nearestEnemyDistance, pickupTarget, startedAt);
     this.nextDecisionAt = args.elapsedMs + AUTOPLAYER_DECISION_INTERVAL_MS;
     return this.direction.clone();
@@ -117,12 +120,15 @@ export class Autoplayer {
     enemies: Phaser.Physics.Arcade.Group;
     enemyBullets: Phaser.Physics.Arcade.Group;
     dashSpeed: number;
+    timeScale: number;
   }): boolean {
     if (args.direction.lengthSq() === 0) return false;
-    const currentRisk = this.scorePosition(args.player.x, args.player.y, 0.32, args.enemies, args.enemyBullets, null, args.player);
-    const dashX = Phaser.Math.Clamp(args.player.x + args.direction.x * args.dashSpeed * 0.25, 22, ARENA_WIDTH - 22);
-    const dashY = Phaser.Math.Clamp(args.player.y + args.direction.y * args.dashSpeed * 0.25, 22, ARENA_HEIGHT - 22);
-    const dashRisk = this.scorePosition(dashX, dashY, 0.32, args.enemies, args.enemyBullets, null, args.player);
+    const scale = Math.max(0.1, args.timeScale);
+    const horizon = 0.32 / scale;
+    const currentRisk = this.scorePosition(args.player.x, args.player.y, horizon, args.enemies, args.enemyBullets, null, args.player, scale);
+    const dashX = Phaser.Math.Clamp(args.player.x + args.direction.x * args.dashSpeed * (0.25 / scale), 22, ARENA_WIDTH - 22);
+    const dashY = Phaser.Math.Clamp(args.player.y + args.direction.y * args.dashSpeed * (0.25 / scale), 22, ARENA_HEIGHT - 22);
+    const dashRisk = this.scorePosition(dashX, dashY, horizon, args.enemies, args.enemyBullets, null, args.player, scale);
     return currentRisk > 38 && dashRisk + 16 < currentRisk;
   }
 
@@ -134,6 +140,7 @@ export class Autoplayer {
     enemyBullets: Phaser.Physics.Arcade.Group,
     pickupTarget: Phaser.Physics.Arcade.Image | null,
     player: Phaser.GameObjects.Shape,
+    timeScale: number,
   ): number {
     let score = 0;
     const pickupDistance = pickupTarget ? Phaser.Math.Distance.Between(x, y, pickupTarget.x, pickupTarget.y) : 0;
@@ -150,10 +157,10 @@ export class Autoplayer {
     }
     score += edgePenalty;
 
-    score += this.getBulletRiskAt(x, y, horizonSeconds, enemyBullets);
+    score += this.getBulletRiskAt(x, y, horizonSeconds, enemyBullets, timeScale);
     score += this.getEnemyRiskAt(x, y, horizonSeconds, enemies, player);
-    score += this.getEscapePenaltyAt(x, y, enemies, enemyBullets, player);
-    const immediateHazard = this.getHazardScoreAt(x, y, enemies, enemyBullets, player);
+    score += this.getEscapePenaltyAt(x, y, enemies, enemyBullets, player, timeScale);
+    const immediateHazard = this.getHazardScoreAt(x, y, enemies, enemyBullets, player, timeScale);
 
     if (!pickupTarget || immediateHazard > 3.5) {
       const centerDistance = Phaser.Math.Distance.Between(x, y, ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
@@ -161,7 +168,7 @@ export class Autoplayer {
     }
 
     if (pickupTarget) {
-      const pickupRisk = this.getHazardScoreAt(pickupTarget.x, pickupTarget.y, enemies, enemyBullets, player);
+      const pickupRisk = this.getHazardScoreAt(pickupTarget.x, pickupTarget.y, enemies, enemyBullets, player, timeScale);
       if (pickupRisk < 4.2) {
         score -= Phaser.Math.Clamp(pickupProgress, -0.8, 1) * 18;
         score += pickupDistance / 90;
@@ -178,12 +185,13 @@ export class Autoplayer {
     pickups: Phaser.Physics.Arcade.Group,
     enemyBullets: Phaser.Physics.Arcade.Group,
     enemies: Phaser.Physics.Arcade.Group,
+    timeScale: number,
   ): Phaser.Physics.Arcade.Image | null {
     if (this.pickupTarget && (!this.pickupTarget.active || !pickups.contains(this.pickupTarget))) {
       this.pickupTarget = null;
     }
 
-    const currentScore = this.pickupTarget ? this.scorePickupTarget(this.pickupTarget, player, pickups, enemyBullets, enemies) : Number.POSITIVE_INFINITY;
+    const currentScore = this.pickupTarget ? this.scorePickupTarget(this.pickupTarget, player, pickups, enemyBullets, enemies, timeScale) : Number.POSITIVE_INFINITY;
     let best: Phaser.Physics.Arcade.Image | null = null;
     let bestScore = Number.POSITIVE_INFINITY;
 
@@ -192,7 +200,7 @@ export class Autoplayer {
     for (let i = 0; i < entries.length; i += step) {
       const pickup = entries[i];
       if (!pickup?.active) continue;
-      const score = this.scorePickupTarget(pickup, player, pickups, enemyBullets, enemies);
+      const score = this.scorePickupTarget(pickup, player, pickups, enemyBullets, enemies, timeScale);
       if (score < bestScore) {
         best = pickup;
         bestScore = score;
@@ -217,8 +225,9 @@ export class Autoplayer {
     pickups: Phaser.Physics.Arcade.Group,
     enemyBullets: Phaser.Physics.Arcade.Group,
     enemies: Phaser.Physics.Arcade.Group,
+    timeScale: number,
   ): number {
-    const hazard = this.getHazardScoreAt(pickup.x, pickup.y, enemies, enemyBullets, player);
+    const hazard = this.getHazardScoreAt(pickup.x, pickup.y, enemies, enemyBullets, player, timeScale);
     if (hazard >= 5.2) return Number.POSITIVE_INFINITY;
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, pickup.x, pickup.y);
@@ -232,9 +241,10 @@ export class Autoplayer {
     pickup: Phaser.Physics.Arcade.Image,
     enemies: Phaser.Physics.Arcade.Group,
     enemyBullets: Phaser.Physics.Arcade.Group,
+    timeScale: number,
   ): boolean {
-    const currentHazard = this.getHazardScoreAt(player.x, player.y, enemies, enemyBullets, player);
-    const pickupHazard = this.getHazardScoreAt(pickup.x, pickup.y, enemies, enemyBullets, player);
+    const currentHazard = this.getHazardScoreAt(player.x, player.y, enemies, enemyBullets, player, timeScale);
+    const pickupHazard = this.getHazardScoreAt(pickup.x, pickup.y, enemies, enemyBullets, player, timeScale);
     if (currentHazard > 2.2 || pickupHazard > 3.8) return false;
 
     const distance = Phaser.Math.Distance.Between(player.x, player.y, pickup.x, pickup.y);
@@ -243,7 +253,7 @@ export class Autoplayer {
       const t = i / samples;
       const x = Phaser.Math.Linear(player.x, pickup.x, t);
       const y = Phaser.Math.Linear(player.y, pickup.y, t);
-      if (this.getHazardScoreAt(x, y, enemies, enemyBullets, player) > 3.2) return false;
+      if (this.getHazardScoreAt(x, y, enemies, enemyBullets, player, timeScale) > 3.2) return false;
     }
 
     return true;
@@ -268,14 +278,17 @@ export class Autoplayer {
     enemies: Phaser.Physics.Arcade.Group,
     enemyBullets: Phaser.Physics.Arcade.Group,
     player: Phaser.GameObjects.Shape,
+    timeScale: number,
   ): number {
-    return this.getBulletRiskAt(x, y, 0.45, enemyBullets) / 24 + this.getEnemyRiskAt(x, y, 0.45, enemies, player) / 42;
+    const horizon = 0.45 / Math.max(0.1, timeScale);
+    return this.getBulletRiskAt(x, y, horizon, enemyBullets, timeScale) / 24 + this.getEnemyRiskAt(x, y, horizon, enemies, player) / 42;
   }
 
-  private getBulletRiskAt(x: number, y: number, horizonSeconds: number, enemyBullets: Phaser.Physics.Arcade.Group): number {
+  private getBulletRiskAt(x: number, y: number, horizonSeconds: number, enemyBullets: Phaser.Physics.Arcade.Group, timeScale: number): number {
     let risk = 0;
     const entries = enemyBullets.children.entries as Phaser.Physics.Arcade.Image[];
     const step = Math.max(1, Math.ceil(entries.length / AUTOPLAYER_BULLET_SCAN_LIMIT));
+    const scale = Math.max(0.1, timeScale);
 
     for (let i = 0; i < entries.length; i += step) {
       const bullet = entries[i];
@@ -286,7 +299,7 @@ export class Autoplayer {
       const dx = x - bullet.x;
       const dy = y - bullet.y;
       const speedSq = vx * vx + vy * vy;
-      const secondsToClosest = speedSq > 0 ? Phaser.Math.Clamp((dx * vx + dy * vy) / speedSq, 0, horizonSeconds + 0.35) : 0;
+      const secondsToClosest = speedSq > 0 ? Phaser.Math.Clamp((dx * vx + dy * vy) / speedSq, 0, horizonSeconds + 0.35 / scale) : 0;
       const closestX = bullet.x + vx * secondsToClosest;
       const closestY = bullet.y + vy * secondsToClosest;
       const closestDistance = Phaser.Math.Distance.Between(x, y, closestX, closestY);
@@ -324,7 +337,14 @@ export class Autoplayer {
     return risk;
   }
 
-  private getEscapePenaltyAt(x: number, y: number, enemies: Phaser.Physics.Arcade.Group, enemyBullets: Phaser.Physics.Arcade.Group, player: Phaser.GameObjects.Shape): number {
+  private getEscapePenaltyAt(
+    x: number,
+    y: number,
+    enemies: Phaser.Physics.Arcade.Group,
+    enemyBullets: Phaser.Physics.Arcade.Group,
+    player: Phaser.GameObjects.Shape,
+    timeScale: number,
+  ): number {
     let safeDirections = 0;
     const probeDistance = 82;
 
@@ -332,7 +352,8 @@ export class Autoplayer {
       if (direction.lengthSq() === 0) continue;
       const probeX = Phaser.Math.Clamp(x + direction.x * probeDistance, 22, ARENA_WIDTH - 22);
       const probeY = Phaser.Math.Clamp(y + direction.y * probeDistance, 22, ARENA_HEIGHT - 22);
-      const risk = this.getBulletRiskAt(probeX, probeY, 0.38, enemyBullets) + this.getEnemyRiskAt(probeX, probeY, 0.38, enemies, player);
+      const probeHorizon = 0.38 / Math.max(0.1, timeScale);
+      const risk = this.getBulletRiskAt(probeX, probeY, probeHorizon, enemyBullets, timeScale) + this.getEnemyRiskAt(probeX, probeY, probeHorizon, enemies, player);
       if (risk < 18) safeDirections += 1;
     }
 

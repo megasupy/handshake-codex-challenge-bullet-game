@@ -4,10 +4,10 @@ import type { PlayerStats } from "./gameTypes";
 
 export const ARENA_WIDTH = 1600;
 export const ARENA_HEIGHT = 900;
-export const UPGRADE_INTERVAL_MS = 12000;
+export const UPGRADE_INTERVAL_MS = 13500;
 export const PLAYER_BULLET_RADIUS = 3;
 export const ENEMY_BULLET_RADIUS = 11;
-export const MAX_ACTIVE_ENEMY_BULLETS = 130;
+export const MAX_ACTIVE_ENEMY_BULLETS = 125;
 export const MAX_ACTIVE_PICKUPS = 45;
 export const MAX_PICKUP_VALUE = 8;
 export const PICKUP_MERGE_RADIUS = 28;
