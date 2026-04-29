@@ -1842,7 +1842,14 @@ function syncProfileFromStorage() {
   currentKeybinds = readKeybinds();
   currentTutorial = readTutorialState();
   currentTelemetryArchive = readTelemetryArchive();
+  telemetryFilterValue = readStoredText(TELEMETRY_FILTER_KEY);
+  runSearchValue = readStoredText(RUN_SEARCH_KEY);
+  runSortValue = readStoredText(RUN_SORT_KEY) || "best";
+  selectedTelemetryRunId = null;
   playerNameInput.value = getSavedName();
+  telemetryFilter.value = telemetryFilterValue;
+  runSearch.value = runSearchValue;
+  runSort.value = runSortValue;
   applyPreferencesToUi(currentPreferences);
   renderSettingsPresetPanel();
   renderProgressionPanel();

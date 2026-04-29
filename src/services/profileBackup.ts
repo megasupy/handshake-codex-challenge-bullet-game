@@ -12,6 +12,9 @@ import { markTutorialSeen, readTutorialState, type TutorialState } from "./tutor
 import { readKeybinds, resetKeybinds, type KeybindState, writeKeybinds } from "./keybinds";
 
 const BACKUP_VERSION = 1;
+const RUN_SEARCH_KEY = "storm_run_search_v1";
+const RUN_SORT_KEY = "storm_run_sort_v1";
+const TELEMETRY_FILTER_KEY = "storm_telemetry_filter_v1";
 
 export type ProfileBackup = {
   version: number;
@@ -27,6 +30,11 @@ export type ProfileBackup = {
   runs: RunRecord[];
   pinnedRunIds: string[];
   telemetryArchive: TelemetryArchiveEntry[];
+  uiState?: {
+    runSearch?: string;
+    runSort?: string;
+    telemetryFilter?: string;
+  };
   checkpoint: CheckpointState | null;
 };
 
@@ -45,6 +53,11 @@ export function exportProfileBackup(): ProfileBackup {
     runs: readRuns(),
     pinnedRunIds: readPinnedRunIds(),
     telemetryArchive: readTelemetryArchive(),
+    uiState: {
+      runSearch: localStorage.getItem(RUN_SEARCH_KEY) || "",
+      runSort: localStorage.getItem(RUN_SORT_KEY) || "best",
+      telemetryFilter: localStorage.getItem(TELEMETRY_FILTER_KEY) || "",
+    },
     checkpoint: readCheckpointSafe(),
   };
 }
@@ -68,6 +81,11 @@ export function importProfileBackup(raw: string): { ok: boolean; error?: string 
     if (Array.isArray(parsed.runs)) writeRuns(parsed.runs);
     if (Array.isArray(parsed.pinnedRunIds)) writePinnedRunIds(parsed.pinnedRunIds.map((id) => String(id)));
     if (Array.isArray(parsed.telemetryArchive)) replaceTelemetryArchive(parsed.telemetryArchive);
+    if (parsed.uiState) {
+      if (parsed.uiState.runSearch !== undefined) setTextState(RUN_SEARCH_KEY, parsed.uiState.runSearch);
+      if (parsed.uiState.runSort !== undefined) setTextState(RUN_SORT_KEY, parsed.uiState.runSort);
+      if (parsed.uiState.telemetryFilter !== undefined) setTextState(TELEMETRY_FILTER_KEY, parsed.uiState.telemetryFilter);
+    }
     if (parsed.checkpoint === null) clearCheckpoint();
     else if (parsed.checkpoint) writeCheckpoint(parsed.checkpoint);
 
@@ -84,4 +102,9 @@ function readCheckpointSafe(): CheckpointState | null {
   } catch {
     return null;
   }
+}
+
+function setTextState(key: string, value: string): void {
+  if (value) localStorage.setItem(key, value);
+  else localStorage.removeItem(key);
 }
