@@ -117,8 +117,10 @@ export class GameScene extends Phaser.Scene {
     this.movePlayer(delta);
     this.autoShoot();
     this.updateBossFlow(threat);
+    if (!this.boss && this.finalApexActive) this.finalApexActive = false;
     if (!this.boss || this.finalApexActive) {
       const phaseId = this.getEnemyPhaseId();
+      const reducedFinalApexSpawns = this.finalApexActive && Boolean(this.boss);
       this.spawnAt = spawnEnemyIfReady({
         scene: this,
         enemies: this.enemies,
@@ -130,7 +132,7 @@ export class GameScene extends Phaser.Scene {
         spawnAt: this.spawnAt,
         threat,
         debug: this.debug,
-        spawnRateScale: this.finalApexActive && Boolean(this.boss) ? 5 : 1,
+        spawnRateScale: reducedFinalApexSpawns ? 5 : 1,
       });
     }
     updateEnemies({
