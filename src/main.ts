@@ -108,6 +108,7 @@ const runFeedCount = mustGet("run-feed-count");
 const runFeedSummary = mustGet("run-feed-summary");
 const runFeedList = mustGet("run-feed-list");
 const profileBackup = mustGet("profile-backup") as HTMLTextAreaElement;
+const profileBackupSavedAt = mustGet("profile-backup-saved-at");
 const profileBackupExport = mustGetButton("profile-backup-export");
 const profileBackupImport = mustGetButton("profile-backup-import");
 const profileBackupCopy = mustGetButton("profile-backup-copy");
@@ -398,6 +399,7 @@ profileBackupExport.addEventListener("click", () => {
   const backup = exportProfileBackup();
   profileBackup.value = JSON.stringify(backup, null, 2);
   profileBackupStatus.textContent = `Exported ${new Date(backup.savedAt).toLocaleString()}.`;
+  renderBackupSavedAt(backup.savedAt);
 });
 profileBackupImport.addEventListener("click", () => {
   const result = importProfileBackup(profileBackup.value);
@@ -407,6 +409,7 @@ profileBackupImport.addEventListener("click", () => {
   }
   syncProfileFromStorage();
   profileBackupStatus.textContent = "Profile restored.";
+  renderBackupSavedAt(new Date().toISOString());
 });
 profileBackupCopy.addEventListener("click", async () => {
   if (!profileBackup.value.trim()) profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
@@ -1433,6 +1436,7 @@ function resetAllLocalData() {
   renderKeybindsPanel();
   refreshCheckpointUi();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
+  renderBackupSavedAt(new Date().toISOString());
   profileBackupStatus.textContent = "All local data reset.";
 }
 
@@ -1466,11 +1470,16 @@ function syncProfileFromStorage() {
   refreshTutorialUi();
   renderKeybindsPanel();
   profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
+  renderBackupSavedAt(new Date().toISOString());
 }
 
 function refreshTutorialUi() {
   tutorialDontShow.checked = !currentTutorial.seen;
   tutorialSummary.textContent = formatTutorialSummary(currentTutorial);
+}
+
+function renderBackupSavedAt(savedAt?: string) {
+  profileBackupSavedAt.textContent = savedAt ? `Last saved: ${new Date(savedAt).toLocaleString()}` : "Last saved: never";
 }
 
 async function copyLatestTelemetryLog() {
