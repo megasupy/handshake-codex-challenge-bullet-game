@@ -7,6 +7,7 @@ import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayl
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
 import { getSavedName } from "./services/localRuns";
+import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { clearTelemetryArchive, formatTelemetryArchiveEntry, readTelemetryArchive, saveTelemetryRun, type TelemetryArchiveEntry } from "./services/telemetryArchive";
 import { formatPreferencesSummary, readPreferences, updatePreferences, type PreferencesState } from "./services/preferences";
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
@@ -61,6 +62,11 @@ const telemetryArchiveList = mustGet("telemetry-archive-list");
 const telemetryArchiveCopy = mustGetButton("telemetry-archive-copy");
 const telemetryArchiveDownload = mustGetButton("telemetry-archive-download");
 const telemetryArchiveClear = mustGetButton("telemetry-archive-clear");
+const profileBackup = mustGet("profile-backup") as HTMLTextAreaElement;
+const profileBackupExport = mustGetButton("profile-backup-export");
+const profileBackupImport = mustGetButton("profile-backup-import");
+const profileBackupCopy = mustGetButton("profile-backup-copy");
+const profileBackupStatus = mustGet("profile-backup-status");
 const upgradeScreen = mustGet("upgrade-screen");
 const gameOver = mustGet("game-over");
 const runSummary = mustGet("run-summary");
@@ -153,6 +159,29 @@ telemetryArchiveClear.addEventListener("click", () => {
   clearTelemetryArchive();
   currentTelemetryArchive = [];
   renderTelemetryArchive();
+});
+profileBackupExport.addEventListener("click", () => {
+  const backup = exportProfileBackup();
+  profileBackup.value = JSON.stringify(backup, null, 2);
+  profileBackupStatus.textContent = `Exported ${new Date(backup.savedAt).toLocaleString()}.`;
+});
+profileBackupImport.addEventListener("click", () => {
+  const result = importProfileBackup(profileBackup.value);
+  if (!result.ok) {
+    profileBackupStatus.textContent = result.error || "Import failed.";
+    return;
+  }
+  syncProfileFromStorage();
+  profileBackupStatus.textContent = "Profile restored.";
+});
+profileBackupCopy.addEventListener("click", async () => {
+  if (!profileBackup.value.trim()) profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
+  try {
+    await navigator.clipboard.writeText(profileBackup.value);
+    profileBackupStatus.textContent = "Backup copied.";
+  } catch {
+    profileBackupStatus.textContent = "Copy failed. Use the text box manually.";
+  }
 });
 mustGetButton("debug-apply-time").addEventListener("click", () => getGameScene()?.setElapsedSeconds(Number(debugControls.time.value) || 0));
 mustGetButton("debug-clear").addEventListener("click", () => getGameScene()?.clearThreats());
@@ -273,6 +302,7 @@ void refreshLeaderboard("endless");
 renderProgressionPanel();
 refreshCheckpointUi();
 renderTelemetryArchive();
+profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
 if (automationConfig.active) {
   queueMicrotask(() => startRun(automationConfig.mode));
 } else if (debugControls.autoplayer.checked) {
@@ -555,6 +585,16 @@ function renderTelemetryArchive() {
     `;
     telemetryArchiveList.append(item);
   });
+}
+
+function syncProfileFromStorage() {
+  currentProgression = readProgression();
+  currentPreferences = readPreferences();
+  currentTelemetryArchive = readTelemetryArchive();
+  playerNameInput.value = getSavedName();
+  applyPreferencesToUi(currentPreferences);
+  renderProgressionPanel();
+  renderTelemetryArchive();
 }
 
 async function copyLatestTelemetryLog() {

@@ -48,6 +48,10 @@ export function clearTelemetryArchive(): void {
   }
 }
 
+export function replaceTelemetryArchive(entries: TelemetryArchiveEntry[]): void {
+  writeTelemetryArchive(entries);
+}
+
 export function formatTelemetryArchiveEntry(entry: TelemetryArchiveEntry): string {
   const lines = entry.logText.split("\n").filter(Boolean).length;
   const survival = toNumber(entry.summary?.survivalMs);
