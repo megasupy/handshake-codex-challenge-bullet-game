@@ -33,4 +33,9 @@ export type RunSummary = Omit<RunRecord, "id" | "playerName" | "createdAt" | "sy
   maxHealth?: number;
   speed?: number;
   finalThreat?: number;
+  damageTaken?: number;
+  damageAttrition?: number;
+  damageBurst?: number;
+  damageCornered?: number;
+  damageBossContact?: number;
 };

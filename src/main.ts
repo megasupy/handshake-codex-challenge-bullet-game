@@ -136,6 +136,7 @@ const pauseRestart = mustGetButton("pause-restart");
 const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
 const runStyle = mustGet("run-style");
+const runDamage = mustGet("run-damage");
 const runComparison = mustGet("run-comparison");
 const runSeed = mustGet("run-seed");
 const leaderboardList = mustGet("leaderboard-list");
@@ -628,6 +629,7 @@ gameEvents.addEventListener("game-over", (event) => {
   text("run-seed", lastRun.seed);
   renderRunSummary(lastRun);
   renderRunStyle(lastRun);
+  renderRunDamage(lastRun);
   renderRunComparison(lastRun, previousRecords);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
@@ -1318,6 +1320,24 @@ function renderRunStyle(run: RunSummary) {
   runStyle.textContent = `${style.title} · ${style.note}`;
 }
 
+function renderRunDamage(run: RunSummary) {
+  runDamage.innerHTML = "";
+  const rows: Record<string, string | number> = {
+    total: run.damageTaken ?? 0,
+    attrition: run.damageAttrition ?? 0,
+    burst: run.damageBurst ?? 0,
+    cornered: run.damageCornered ?? 0,
+    boss: run.damageBossContact ?? 0,
+  };
+
+  for (const [label, value] of Object.entries(rows)) {
+    const item = document.createElement("div");
+    item.className = "debug-stat";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    runDamage.append(item);
+  }
+}
+
 function renderRunComparison(run: RunSummary, previous: RecordsState) {
   runComparison.innerHTML = "";
   const rows: Array<[string, string | number]> = [
@@ -1719,6 +1739,11 @@ function buildRunReport(run: RunSummary): string {
     `bosses: ${run.bossesDefeated ?? 0}`,
     `buildStyle: ${style.title}`,
     `buildNote: ${style.note}`,
+    `damageTaken: ${run.damageTaken ?? 0}`,
+    `damageAttrition: ${run.damageAttrition ?? 0}`,
+    `damageBurst: ${run.damageBurst ?? 0}`,
+    `damageCornered: ${run.damageCornered ?? 0}`,
+    `damageBossContact: ${run.damageBossContact ?? 0}`,
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
   ];
   return lines.join("\n");

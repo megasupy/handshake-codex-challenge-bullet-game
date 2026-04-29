@@ -69,6 +69,11 @@ export class GameScene extends Phaser.Scene {
   private playerShotsHit = 0;
   private upgradesTaken = 0;
   private bossesDefeated = 0;
+  private damageTaken = 0;
+  private damageAttrition = 0;
+  private damageBurst = 0;
+  private damageCornered = 0;
+  private damageBossContact = 0;
   private checkpointSaveAt = 0;
   private runEnded = false;
 
@@ -244,6 +249,11 @@ export class GameScene extends Phaser.Scene {
     this.playerShotsHit = 0;
     this.upgradesTaken = 0;
     this.bossesDefeated = 0;
+    this.damageTaken = 0;
+    this.damageAttrition = 0;
+    this.damageBurst = 0;
+    this.damageCornered = 0;
+    this.damageBossContact = 0;
     this.checkpointSaveAt = 2000;
     this.runEnded = false;
     this.stats = this.initialProgression ? applyProgression({ ...DEFAULT_PLAYER_STATS }, this.initialProgression) : { ...DEFAULT_PLAYER_STATS };
@@ -749,6 +759,11 @@ export class GameScene extends Phaser.Scene {
       maxHealth: this.health,
       speed: this.stats.speed,
       finalThreat: this.getThreatLevel(),
+      damageTaken: this.damageTaken,
+      damageAttrition: this.damageAttrition,
+      damageBurst: this.damageBurst,
+      damageCornered: this.damageCornered,
+      damageBossContact: this.damageBossContact,
     };
 
     this.scene.pause();
@@ -798,6 +813,11 @@ export class GameScene extends Phaser.Scene {
     if (this.boss?.overlapsPlayer(this.player.x, this.player.y, 7)) context = "boss-contact";
     else if (bullets >= 120) context = "burst";
     else if (edgeDistance < 90) context = "cornered";
+    this.damageTaken += 1;
+    if (context === "boss-contact") this.damageBossContact += 1;
+    else if (context === "burst") this.damageBurst += 1;
+    else if (context === "cornered") this.damageCornered += 1;
+    else this.damageAttrition += 1;
     this.telemetry?.logEvent(this.elapsedMs, "damage", {
       health: this.health,
       threat: this.getThreatLevel(),
