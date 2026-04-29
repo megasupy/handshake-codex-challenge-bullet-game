@@ -55,13 +55,15 @@ export function spawnEnemyIfReady(args: {
   spawnAt: number;
   threat: number;
   debug: DebugSettings;
+  spawnRateScale?: number;
 }): number {
   if (args.elapsedMs < args.spawnAt) return args.spawnAt;
   if (args.enemies.countActive(true) >= args.debug.enemyCap) return args.elapsedMs + 260;
 
   const block = getWaveBlock(args.phaseId, args.elapsedInPhaseMs);
   const threatRamp = args.threat > 32 ? 0.74 : args.threat > 24 ? 0.84 : 1;
-  const interval = Math.max(165, (1020 / Math.log2(args.threat + 2.4)) * block.spawnScale * threatRamp * args.debug.spawnMultiplier);
+  const rateScale = Math.max(0.2, args.spawnRateScale ?? 1);
+  const interval = Math.max(165, (1020 / Math.log2(args.threat + 2.4)) * block.spawnScale * threatRamp * args.debug.spawnMultiplier * rateScale);
   const kind = weightedPick(block.mix, args.rng);
   if (!kind) return args.elapsedMs + interval;
   if (!canSpawnKind(args.enemies, kind)) return args.elapsedMs + interval * 0.55;

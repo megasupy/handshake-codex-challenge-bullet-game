@@ -29,12 +29,12 @@ export class Boss1Controller {
   private view: Phaser.GameObjects.Graphics;
   private currentPatternId = "idle";
 
-  constructor(private readonly scene: Phaser.Scene, elapsedMs: number, threat: number, bossId: 1 | 2 | 3) {
+  constructor(private readonly scene: Phaser.Scene, elapsedMs: number, threat: number, bossId: 1 | 2 | 3, hpMultiplier = 1) {
     this.bornAt = elapsedMs;
     this.bossId = bossId;
     this.name = bossId === 1 ? "Vector Regent" : bossId === 2 ? "Lane Warden" : "Apex Engine";
     const hpBase = bossId === 1 ? 640 : bossId === 2 ? 840 : 1120;
-    this.maxHp = hpBase + Math.floor(threat * 33);
+    this.maxHp = Math.floor((hpBase + Math.floor(threat * 33)) * Math.max(1, hpMultiplier));
     this.hp = this.maxHp;
     this.phaseDamageRequired = [this.maxHp * 0.36, this.maxHp * 0.36, this.maxHp * 0.28];
     this.attackAt = elapsedMs + 850;

@@ -46,6 +46,7 @@ export class GameScene extends Phaser.Scene {
   private nextUpgradeAt = UPGRADE_INTERVAL_MS;
   private nextBossAt = FIRST_BOSS_AT_MS;
   private bossEncountersSpawned = 0;
+  private finalApexActive = false;
   private maxThreatLevel = 1;
   private debug: DebugSettings = { ...DEFAULT_DEBUG_SETTINGS };
   private stats = { ...DEFAULT_PLAYER_STATS };
@@ -116,7 +117,7 @@ export class GameScene extends Phaser.Scene {
     this.movePlayer(delta);
     this.autoShoot();
     this.updateBossFlow(threat);
-    if (!this.boss) {
+    if (!this.boss || this.finalApexActive) {
       const phaseId = this.getEnemyPhaseId();
       this.spawnAt = spawnEnemyIfReady({
         scene: this,
@@ -129,6 +130,7 @@ export class GameScene extends Phaser.Scene {
         spawnAt: this.spawnAt,
         threat,
         debug: this.debug,
+        spawnRateScale: this.finalApexActive && Boolean(this.boss) ? 5 : 1,
       });
     }
     updateEnemies({
@@ -176,6 +178,7 @@ export class GameScene extends Phaser.Scene {
       this.boss.destroy();
       this.boss = null;
       this.activeBossStartedAt = null;
+      this.finalApexActive = false;
       this.nextBossAt =
         this.bossEncountersSpawned === 1 ? SECOND_BOSS_AT_MS :
           this.bossEncountersSpawned === 2 ? THIRD_BOSS_AT_MS :
@@ -205,6 +208,7 @@ export class GameScene extends Phaser.Scene {
     this.nextUpgradeAt = UPGRADE_INTERVAL_MS;
     this.nextBossAt = FIRST_BOSS_AT_MS;
     this.bossEncountersSpawned = 0;
+    this.finalApexActive = false;
     this.maxThreatLevel = 1;
     this.boss = null;
     this.activeBossStartedAt = null;
@@ -259,11 +263,14 @@ export class GameScene extends Phaser.Scene {
       this.enemies.clear(true, true);
       this.physics.resume();
       this.pausedForUpgrade = false;
-      const bossId = Math.min(3, this.bossEncountersSpawned + 1) as 1 | 2 | 3;
-      this.boss = new Boss1Controller(this, this.elapsedMs, threat, bossId);
+      const encounterNumber = this.bossEncountersSpawned + 1;
+      const bossId = Math.min(3, encounterNumber) as 1 | 2 | 3;
+      const finalApex = encounterNumber === 4 && bossId === 3;
+      this.finalApexActive = finalApex;
+      this.boss = new Boss1Controller(this, this.elapsedMs, threat, bossId, finalApex ? 4 : 1);
       this.bossEncountersSpawned += 1;
       this.activeBossStartedAt = this.elapsedMs;
-      this.telemetry?.logEvent(this.elapsedMs, "boss-spawn", { threat, bossId });
+      this.telemetry?.logEvent(this.elapsedMs, "boss-spawn", { threat, bossId, finalApex });
       this.cameras.main.shake(240, 0.004);
       playSound("upgrade");
     }
@@ -464,10 +471,15 @@ export class GameScene extends Phaser.Scene {
     this.boss = null;
     this.activeBossStartedAt = null;
     this.score += 250;
-    this.nextBossAt =
-      this.bossEncountersSpawned === 1 ? SECOND_BOSS_AT_MS :
-        this.bossEncountersSpawned === 2 ? THIRD_BOSS_AT_MS :
-          this.elapsedMs + BOSS_RESPAWN_DELAY_MS;
+    if (this.finalApexActive) {
+      this.nextBossAt = Number.POSITIVE_INFINITY;
+      this.finalApexActive = false;
+    } else {
+      this.nextBossAt =
+        this.bossEncountersSpawned === 1 ? SECOND_BOSS_AT_MS :
+          this.bossEncountersSpawned === 2 ? THIRD_BOSS_AT_MS :
+            this.elapsedMs + BOSS_RESPAWN_DELAY_MS;
+    }
     this.spawnAt = this.elapsedMs + 1200;
     playSound("enemy-death");
     this.emitBossState();
