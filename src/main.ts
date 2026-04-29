@@ -152,6 +152,7 @@ const submitButton = mustGetButton("submit-button");
 const replayButton = mustGetButton("replay-button");
 const copySeedButton = mustGetButton("copy-seed-button");
 const copyLinkButton = mustGetButton("copy-link-button");
+const copyReportButton = mustGetButton("copy-report-button");
 const restartButton = mustGetButton("restart-button");
 const menuButton = mustGetButton("menu-button");
 const playerNameInput = mustGetInput("player-name");
@@ -263,6 +264,16 @@ copyLinkButton.addEventListener("click", async () => {
     submitStatus.textContent = "Replay link copied.";
   } catch {
     submitStatus.textContent = link;
+  }
+});
+copyReportButton.addEventListener("click", async () => {
+  if (!lastRun) return;
+  const report = buildRunReport(lastRun);
+  try {
+    await navigator.clipboard.writeText(report);
+    submitStatus.textContent = "Run report copied.";
+  } catch {
+    submitStatus.textContent = report;
   }
 });
 recentRunsList.addEventListener("click", (event) => {
@@ -1452,6 +1463,23 @@ function buildReplayLink(run: Pick<RunSummary, "mode" | "seed">) {
 
 function buildRunLink(run: Pick<RunRecord, "mode" | "seed">) {
   return buildReplayLink(run);
+}
+
+function buildRunReport(run: RunSummary): string {
+  const lines = [
+    `mode: ${run.mode}`,
+    `seed: ${run.seed}`,
+    `survival: ${(run.survivalMs / 1000).toFixed(1)}s`,
+    `score: ${run.score}`,
+    `kills: ${run.kills}`,
+    `threat: ${run.maxThreatLevel}`,
+    `shots: ${run.shotsFired ?? 0}`,
+    `accuracy: ${((run.shotAccuracy ?? 0) * 100).toFixed(0)}%`,
+    `upgrades: ${run.upgradesTaken ?? 0}`,
+    `bosses: ${run.bossesDefeated ?? 0}`,
+    `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
+  ];
+  return lines.join("\n");
 }
 
 function readLeaderboardMode(): GameMode {
