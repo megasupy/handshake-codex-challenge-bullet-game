@@ -12,6 +12,7 @@ import { exportProfileBackup, importProfileBackup } from "./services/profileBack
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
 import { clearTelemetryArchive, formatTelemetryArchiveEntry, readTelemetryArchive, saveTelemetryRun, type TelemetryArchiveEntry } from "./services/telemetryArchive";
 import { formatPreferencesSummary, readPreferences, updatePreferences, type PreferencesState } from "./services/preferences";
+import { formatRecordsSummary, readRecords, updateRecords, type RecordsState } from "./services/records";
 import { PROGRESSION_UPGRADES, buyUpgrade, formatProgressionSummary, grantRunReward, getUpgradeCost, readProgression, resetProgression, type ProgressionState, type ProgressionUpgradeId } from "./services/progression";
 import type { GameMode, LeaderboardResult, RunRecord, RunSummary } from "./types";
 import type { TelemetryConfig, TelemetryRun } from "./game/telemetry";
@@ -53,6 +54,8 @@ const checkpointSummary = mustGet("checkpoint-summary");
 const progressionStats = mustGet("progression-stats");
 const progressionUpgrades = mustGet("progression-upgrades");
 const progressionReset = mustGetButton("progression-reset");
+const recordsSummary = mustGet("records-summary");
+const recordsStats = mustGet("records-stats");
 const preferencesSummary = mustGet("preferences-summary");
 const prefsVolume = mustGetInput("prefs-volume");
 const prefsVolumeValue = mustGet("prefs-volume-value");
@@ -128,6 +131,7 @@ let lastRun: RunSummary | null = null;
 let currentUpgradeOptions: UpgradeOption[] = [];
 let currentProgression: ProgressionState = readProgression();
 let currentPreferences: PreferencesState = readPreferences();
+let currentRecords: RecordsState = readRecords();
 let currentKeybinds: KeybindState = readKeybinds();
 let currentTelemetryArchive: TelemetryArchiveEntry[] = readTelemetryArchive();
 let currentTutorial: TutorialState = readTutorialState();
@@ -317,6 +321,7 @@ gameEvents.addEventListener("upgrade", (event) => {
 gameEvents.addEventListener("game-over", (event) => {
   lastRun = (event as CustomEvent<RunSummary>).detail;
   currentProgression = grantRunReward(lastRun);
+  currentRecords = updateRecords(lastRun);
   text("game-over-status", lastRun.survivalMs >= 60000 ? "Storm survived" : "Run ended");
   text("final-score", lastRun.score.toLocaleString());
   text("final-time", `${(lastRun.survivalMs / 1000).toFixed(1)}s`);
@@ -326,6 +331,7 @@ gameEvents.addEventListener("game-over", (event) => {
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
   renderProgressionPanel();
+  renderRecordsPanel();
   show(gameOver);
   hideHud();
   hideBossHud();
@@ -370,6 +376,7 @@ gameEvents.addEventListener("automation-snapshot", (event) => {
 
 void refreshLeaderboard("endless");
 renderProgressionPanel();
+renderRecordsPanel();
 refreshCheckpointUi();
 renderTelemetryArchive();
 profileBackup.value = JSON.stringify(exportProfileBackup(), null, 2);
@@ -602,6 +609,27 @@ function renderProgressionPanel() {
   }
 }
 
+function renderRecordsPanel() {
+  recordsSummary.textContent = formatRecordsSummary(currentRecords);
+  recordsStats.innerHTML = "";
+
+  const stats: Record<string, string | number> = {
+    score: currentRecords.bestScore.toLocaleString(),
+    survival: `${(currentRecords.bestSurvivalMs / 1000).toFixed(1)}s`,
+    kills: currentRecords.bestKills,
+    threat: currentRecords.bestThreat,
+    accuracy: `${(currentRecords.bestAccuracy * 100).toFixed(0)}%`,
+    bosses: currentRecords.bestBosses,
+  };
+
+  for (const [label, value] of Object.entries(stats)) {
+    const stat = document.createElement("div");
+    stat.className = "debug-stat";
+    stat.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    recordsStats.append(stat);
+  }
+}
+
 function applyPreferenceControls() {
   currentPreferences = updatePreferences({
     soundVolume: Number(prefsVolume.value),
@@ -719,12 +747,14 @@ function renderTelemetryArchive() {
 function syncProfileFromStorage() {
   currentProgression = readProgression();
   currentPreferences = readPreferences();
+  currentRecords = readRecords();
   currentKeybinds = readKeybinds();
   currentTutorial = readTutorialState();
   currentTelemetryArchive = readTelemetryArchive();
   playerNameInput.value = getSavedName();
   applyPreferencesToUi(currentPreferences);
   renderProgressionPanel();
+  renderRecordsPanel();
   renderTelemetryArchive();
   refreshTutorialUi();
   renderKeybindsPanel();

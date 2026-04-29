@@ -4,6 +4,7 @@ import { clearCheckpoint, writeCheckpoint } from "./checkpoint";
 import { readRuns, saveName, writeRuns } from "./localRuns";
 import { readPreferences, writePreferences, type PreferencesState } from "./preferences";
 import { readProgression, writeProgression, type ProgressionState } from "./progression";
+import { readRecords, writeRecords, type RecordsState } from "./records";
 import { readTelemetryArchive, replaceTelemetryArchive, type TelemetryArchiveEntry } from "./telemetryArchive";
 import { markTutorialSeen, readTutorialState, type TutorialState } from "./tutorial";
 import { readKeybinds, resetKeybinds, type KeybindState, writeKeybinds } from "./keybinds";
@@ -16,6 +17,7 @@ export type ProfileBackup = {
   playerName: string;
   progression: ProgressionState;
   preferences: PreferencesState;
+  records: RecordsState;
   tutorial: TutorialState;
   keybinds: KeybindState;
   runs: RunRecord[];
@@ -30,6 +32,7 @@ export function exportProfileBackup(): ProfileBackup {
     playerName: localStorage.getItem("storm_player_name_v1") || "",
     progression: readProgression(),
     preferences: readPreferences(),
+    records: readRecords(),
     tutorial: readTutorialState(),
     keybinds: readKeybinds(),
     runs: readRuns(),
@@ -48,6 +51,7 @@ export function importProfileBackup(raw: string): { ok: boolean; error?: string 
     if (parsed.playerName !== undefined) saveName(String(parsed.playerName));
     if (parsed.progression) writeProgression(parsed.progression);
     if (parsed.preferences) writePreferences(parsed.preferences);
+    if (parsed.records) writeRecords(parsed.records);
     if (parsed.tutorial) markTutorialSeen(parsed.tutorial.seen);
     if (parsed.keybinds) writeKeybinds(parsed.keybinds);
     else resetKeybinds();
