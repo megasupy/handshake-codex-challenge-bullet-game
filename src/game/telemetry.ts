@@ -40,6 +40,14 @@ export type TelemetrySample = {
   decisionTimeMs: number;
   edgeDistance: number;
   reason: string;
+  playerDamage: number;
+  playerProjectiles: number;
+  playerFireRate: number;
+  playerPierce: number;
+  playerProjectileSpeed: number;
+  shotsFired: number;
+  shotsHit: number;
+  shotAccuracy: number;
 };
 
 export type TelemetryRun = {
@@ -140,6 +148,14 @@ export class TelemetryRecorder {
       `projDanger=${sample.projectedDanger}`,
       `decisionMs=${sample.decisionTimeMs}`,
       `reason=${sample.reason}`,
+      `pDmg=${sample.playerDamage}`,
+      `pProj=${sample.playerProjectiles}`,
+      `pRate=${sample.playerFireRate}`,
+      `pPierce=${sample.playerPierce}`,
+      `pVel=${sample.playerProjectileSpeed}`,
+      `shots=${sample.shotsFired}`,
+      `hits=${sample.shotsHit}`,
+      `acc=${sample.shotAccuracy}`,
     ].join(" ");
   }
 }

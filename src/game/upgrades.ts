@@ -87,13 +87,15 @@ function getAutoplayerUpgradeScore(id: string, stats: PlayerStats, health: numbe
   };
 
   const missingHealth = stats.maxHealth - health;
+  const throughput = stats.damage * stats.projectiles * (250 / Math.max(80, stats.fireRate)) * (1 + stats.pierce * 0.22);
+  const needsThroughput = throughput < 6.8 ? 1 : throughput < 9.2 ? 0.55 : 0.15;
   const scores: Record<string, number> = {
-    damage: weakness.damage * 1.1,
-    "heavy-damage": weakness.damage * 0.95,
-    rate: weakness.fireRate,
-    projectile: weakness.projectiles,
-    volley: weakness.projectiles * 0.92,
-    pierce: weakness.pierce * 0.8,
+    damage: weakness.damage * 1.1 + needsThroughput * 0.18,
+    "heavy-damage": weakness.damage * 0.95 + needsThroughput * 0.2,
+    rate: weakness.fireRate + needsThroughput * 0.36,
+    projectile: weakness.projectiles + needsThroughput * 0.65,
+    volley: weakness.projectiles * 0.92 + needsThroughput * 0.72,
+    pierce: weakness.pierce * 0.8 + needsThroughput * 0.2,
     velocity: weakness.velocity * 0.75,
     speed: weakness.speed,
     overdrive: (weakness.damage + weakness.fireRate + weakness.speed) / 3,

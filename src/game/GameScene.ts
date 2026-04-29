@@ -52,6 +52,8 @@ export class GameScene extends Phaser.Scene {
   private lastFrameMs = 0;
   private activeBossStartedAt: number | null = null;
   private initialElapsedMs = 0;
+  private playerShotsFired = 0;
+  private playerShotsHit = 0;
 
   constructor() {
     super("game");
@@ -195,6 +197,8 @@ export class GameScene extends Phaser.Scene {
     this.maxThreatLevel = 1;
     this.boss = null;
     this.activeBossStartedAt = null;
+    this.playerShotsFired = 0;
+    this.playerShotsHit = 0;
     this.stats = { ...DEFAULT_PLAYER_STATS };
   }
 
@@ -329,6 +333,7 @@ export class GameScene extends Phaser.Scene {
     const shots = this.getPlayerShotAngles(angle, spread);
 
     for (const shotAngle of shots) {
+      this.playerShotsFired += 1;
       firePlayerShot(
         this,
         this.playerShots,
@@ -364,6 +369,7 @@ export class GameScene extends Phaser.Scene {
     const shot = shotObject as Phaser.Physics.Arcade.Image;
     const enemy = enemyObject as Phaser.GameObjects.Shape & { setFillStyle: (color: number, alpha?: number) => unknown };
     const data = enemy.getData("enemy") as EnemyData;
+    this.playerShotsHit += 1;
     data.hp -= shot.getData("damage") as number;
     const pierce = shot.getData("pierce") as number;
     if (pierce > 0) {
@@ -386,6 +392,7 @@ export class GameScene extends Phaser.Scene {
       if (!shot.active) return true;
       const result = this.boss.hitByShot(shot, this.elapsedMs);
       if (!result.hit) return true;
+      this.playerShotsHit += 1;
       this.telemetry?.logEvent(this.elapsedMs, "boss-hit", { hpRatio: round(this.boss.hp / this.boss.maxHp) });
       playSound(result.phaseChanged ? "upgrade" : "enemy-hit");
       if (result.phaseChanged) {
@@ -559,6 +566,9 @@ export class GameScene extends Phaser.Scene {
         danger: round(autoplayer.danger),
         projectedDanger: round(autoplayer.projectedDanger),
         reasonTag: autoplayer.reason,
+        shotsFired: this.playerShotsFired,
+        shotsHit: this.playerShotsHit,
+        shotAccuracy: this.playerShotsFired > 0 ? round(this.playerShotsHit / this.playerShotsFired) : 0,
       });
       const run = this.telemetry.finalize({
         reason,
@@ -624,6 +634,14 @@ export class GameScene extends Phaser.Scene {
       dashReady: this.elapsedMs >= this.dashAt,
       frameMs: round(this.lastFrameMs),
       edgeDistance: round(Math.min(this.player.x, ARENA_WIDTH - this.player.x, this.player.y, ARENA_HEIGHT - this.player.y)),
+      playerDamage: this.stats.damage,
+      playerProjectiles: this.stats.projectiles,
+      playerFireRate: this.stats.fireRate,
+      playerPierce: this.stats.pierce,
+      playerProjectileSpeed: this.stats.projectileSpeed,
+      shotsFired: this.playerShotsFired,
+      shotsHit: this.playerShotsHit,
+      shotAccuracy: this.playerShotsFired > 0 ? round(this.playerShotsHit / this.playerShotsFired) : 0,
       ...toAutoplayerSample(autoplayer),
     });
     if (this.telemetryConfig.exportToDom) {
@@ -638,7 +656,14 @@ export class GameScene extends Phaser.Scene {
     this.stats = result.stats;
     this.health = result.health;
     this.nextUpgradeAt += UPGRADE_INTERVAL_MS;
-    this.telemetry?.logEvent(this.elapsedMs, "upgrade-picked", { id });
+    this.telemetry?.logEvent(this.elapsedMs, "upgrade-picked", {
+      id,
+      damage: this.stats.damage,
+      projectiles: this.stats.projectiles,
+      fireRate: this.stats.fireRate,
+      pierce: this.stats.pierce,
+      projectileSpeed: this.stats.projectileSpeed,
+    });
     upgradePulse(this, this.player);
     playSound("upgrade");
   }
