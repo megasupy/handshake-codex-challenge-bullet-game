@@ -68,6 +68,16 @@
               Run Search
               <input id="run-search" class="mt-2 w-full rounded-md border border-line bg-slate-950/80 px-3 py-2 text-sm text-white outline-none ring-pulse focus:ring-2" placeholder="player, mode, seed, score..." />
             </label>
+            <label class="mt-4 block text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
+              Sort Recent Runs
+              <select id="run-sort" class="mt-2 w-full rounded-md border border-line bg-slate-950/80 px-3 py-2 text-sm text-white outline-none ring-pulse focus:ring-2">
+                <option value="best">Best</option>
+                <option value="newest">Newest</option>
+                <option value="score">Score</option>
+                <option value="kills">Kills</option>
+                <option value="survival">Survival</option>
+              </select>
+            </label>
             <div class="mt-6 flex flex-wrap gap-2 text-sm text-slate-400">
               <span>Move: remappable</span>
               <span>Dash: remappable</span>

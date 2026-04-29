@@ -6,7 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
-import { getPendingRuns, getSavedName, isRunPinned, readRuns, sortRunsWithPinned, toggleRunPinned } from "./services/localRuns";
+import { getPendingRuns, getSavedName, isRunPinned, readPinnedRunIds, readRuns, sortRunsWithPinned, toggleRunPinned } from "./services/localRuns";
 import { formatKeybindSummary, readKeybinds, resetKeybinds, updateKeybind, type KeybindAction, type KeybindState } from "./services/keybinds";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
@@ -23,6 +23,7 @@ const AUTOPLAYER_KEY = "storm_debug_autoplayer_v1";
 const LEADERBOARD_MODE_KEY = "storm_leaderboard_mode_v1";
 const RUN_SEARCH_KEY = "storm_run_search_v1";
 const TELEMETRY_FILTER_KEY = "storm_telemetry_filter_v1";
+const RUN_SORT_KEY = "storm_run_sort_v1";
 const query = new URLSearchParams(window.location.search);
 const automationConfig = getAutomationConfig();
 
@@ -161,6 +162,7 @@ const tutorialSummary = mustGet("tutorial-summary");
 const dailySeedPreview = mustGet("daily-seed-preview");
 const dailySeedCopy = mustGetButton("daily-seed-copy");
 const runSearch = mustGetInput("run-search");
+const runSort = mustGet("run-sort") as HTMLSelectElement;
 const submitButton = mustGetButton("submit-button");
 const replayButton = mustGetButton("replay-button");
 const copySeedButton = mustGetButton("copy-seed-button");
@@ -213,6 +215,7 @@ let selectedBoardRun: RunRecord | null = null;
 let telemetryFilterValue = readStoredText(TELEMETRY_FILTER_KEY);
 let selectedTelemetryRunId: string | null = null;
 let runSearchValue = readStoredText(RUN_SEARCH_KEY);
+let runSortValue = readStoredText(RUN_SORT_KEY) || "best";
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 let toastId = 0;
@@ -228,6 +231,7 @@ tutorialDontShow.checked = !currentTutorial.seen;
 renderKeybindsPanel();
 telemetryFilter.value = telemetryFilterValue;
 runSearch.value = runSearchValue;
+runSort.value = runSortValue;
 refreshDailySeedUi();
 
 playButton.addEventListener("click", () => startRun("endless"));
@@ -460,6 +464,11 @@ runSearch.addEventListener("input", () => {
   writeStoredText(RUN_SEARCH_KEY, runSearchValue);
   renderRecentRunsPanel();
   renderLeaderboard({ source: leaderboardSource.textContent === "Online" ? "remote" : "local", rows: currentLeaderboardRows });
+});
+runSort.addEventListener("change", () => {
+  runSortValue = runSort.value;
+  writeStoredText(RUN_SORT_KEY, runSortValue);
+  renderRecentRunsPanel();
 });
 profileBackupExport.addEventListener("click", () => {
   const backup = exportProfileBackup();
@@ -999,7 +1008,7 @@ function renderSelectedRunPanel() {
 
 function renderRecentRunsPanel() {
   const allRuns = readRuns();
-  const runs = filterRuns(sortRunsWithPinned(allRuns));
+  const runs = filterRuns(sortRunsForView(allRuns));
   recentRunsCount.textContent = runSearchValue ? `${runs.length}/${allRuns.length} run${allRuns.length === 1 ? "" : "s"}` : `${runs.length} run${runs.length === 1 ? "" : "s"}`;
   recentRunsSummary.textContent = runs.length > 0
     ? runSearchValue
@@ -1103,6 +1112,56 @@ function renderRunComparisonGrid(container: HTMLElement, run: RunRecord | null) 
 function filterRuns(runs: RunRecord[]): RunRecord[] {
   if (!runSearchValue) return runs;
   return runs.filter((run) => matchesRunSearch(run));
+}
+
+function sortRunsForView(runs: RunRecord[]): RunRecord[] {
+  const copy = [...runs];
+  switch (runSortValue) {
+    case "newest":
+      return copy.sort((a, b) => {
+        const aTime = Date.parse(a.createdAt || "");
+        const bTime = Date.parse(b.createdAt || "");
+        if (bTime !== aTime) return bTime - aTime;
+        return compareLocalRuns(a, b);
+      });
+    case "score":
+      return sortPinnedThen(copy, (a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.survivalMs !== a.survivalMs) return b.survivalMs - a.survivalMs;
+        return b.kills - a.kills;
+      });
+    case "kills":
+      return sortPinnedThen(copy, (a, b) => {
+        if (b.kills !== a.kills) return b.kills - a.kills;
+        if (b.score !== a.score) return b.score - a.score;
+        return b.survivalMs - a.survivalMs;
+      });
+    case "survival":
+      return sortPinnedThen(copy, (a, b) => {
+        if (b.survivalMs !== a.survivalMs) return b.survivalMs - a.survivalMs;
+        if (b.score !== a.score) return b.score - a.score;
+        return b.kills - a.kills;
+      });
+    case "best":
+    default:
+      return sortRunsWithPinned(copy);
+  }
+}
+
+function sortPinnedThen(runs: RunRecord[], compare: (a: RunRecord, b: RunRecord) => number): RunRecord[] {
+  const pinned = new Set(readPinnedRunIds());
+  return [...runs].sort((a, b) => {
+    const aPinned = pinned.has(a.id);
+    const bPinned = pinned.has(b.id);
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+    return compare(a, b);
+  });
+}
+
+function compareLocalRuns(a: RunRecord, b: RunRecord): number {
+  if (b.survivalMs !== a.survivalMs) return b.survivalMs - a.survivalMs;
+  if (b.score !== a.score) return b.score - a.score;
+  return b.kills - a.kills;
 }
 
 function matchesRunSearch(run: RunRecord): boolean {
@@ -1582,6 +1641,7 @@ function resetAllLocalData() {
     "storm_runs_v1",
     "storm_pinned_runs_v1",
     "storm_run_search_v1",
+    "storm_run_sort_v1",
     "storm_telemetry_filter_v1",
     "storm_telemetry_archive_v1",
     "storm_checkpoint_v1",
@@ -1605,9 +1665,11 @@ function resetAllLocalData() {
   selectedTelemetryRunId = null;
   telemetryFilterValue = "";
   runSearchValue = "";
+  runSortValue = "best";
   playerNameInput.value = getSavedName();
   telemetryFilter.value = "";
   runSearch.value = "";
+  runSort.value = "best";
   applyPreferencesToUi(currentPreferences);
   renderSettingsPresetPanel();
   renderProgressionPanel();
