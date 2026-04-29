@@ -193,6 +193,9 @@ const runSort = mustGet("run-sort") as HTMLSelectElement;
 const runTagFilterSummary = mustGet("run-tag-filter-summary");
 const runTagFilterChips = mustGet("run-tag-filter-chips");
 const runTagFilterClear = mustGetButton("run-tag-filter-clear");
+const tagStatsCount = mustGet("tag-stats-count");
+const tagStatsSummary = mustGet("tag-stats-summary");
+const tagStatsList = mustGet("tag-stats-list");
 const submitButton = mustGetButton("submit-button");
 const replayButton = mustGetButton("replay-button");
 const copySeedButton = mustGetButton("copy-seed-button");
@@ -572,6 +575,13 @@ runTagFilterChips.addEventListener("click", (event) => {
   const chip = target.closest("[data-run-tag]") as HTMLElement | null;
   if (!chip) return;
   const tag = chip.dataset.runTag || "";
+  setRunTagFilter(tag);
+});
+tagStatsList.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const chip = target.closest("[data-tag-filter]") as HTMLElement | null;
+  if (!chip) return;
+  const tag = chip.dataset.tagFilter || "";
   setRunTagFilter(tag);
 });
 runSort.addEventListener("change", () => {
@@ -1231,6 +1241,7 @@ function renderRecentRunsPanel() {
     selectedRecentRun = runs[0] || null;
   }
   renderRunTagFilterUi(runs);
+  renderTagStatsPanel(allRuns);
   renderSelectedRunPanel();
 }
 
@@ -1323,6 +1334,51 @@ function renderRunTagFilterUi(runs: RunRecord[] = sortRunsForView(readRuns())) {
       : "rounded-full border border-line bg-slate-950/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-300";
     button.textContent = tag;
     runTagFilterChips.append(button);
+  }
+}
+
+function renderTagStatsPanel(runs: RunRecord[] = readRuns()) {
+  const counts = new Map<string, number>();
+  for (const run of runs) {
+    for (const tag of run.tags || []) {
+      const normalized = tag.trim().toLowerCase();
+      if (!normalized) continue;
+      counts.set(normalized, (counts.get(normalized) || 0) + 1);
+    }
+  }
+
+  const sorted = [...counts.entries()].sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return a[0].localeCompare(b[0]);
+  });
+
+  const totalTaggedRuns = runs.filter((run) => (run.tags || []).length > 0).length;
+  tagStatsCount.textContent = `${sorted.length} tag${sorted.length === 1 ? "" : "s"}`;
+  tagStatsSummary.textContent = sorted.length > 0
+    ? `${totalTaggedRuns} run${totalTaggedRuns === 1 ? "" : "s"} carry tags. Top tag: ${sorted[0][0]} (${sorted[0][1]} run${sorted[0][1] === 1 ? "" : "s"}).`
+    : "No tags recorded yet.";
+  tagStatsList.innerHTML = "";
+
+  if (sorted.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "text-xs text-slate-500";
+    empty.textContent = "No tag stats yet.";
+    tagStatsList.append(empty);
+    return;
+  }
+
+  for (const [tag, count] of sorted.slice(0, 10)) {
+    const item = document.createElement("li");
+    item.className = "inline-flex";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.tagFilter = tag;
+    button.className = runTagFilterValue === tag
+      ? "rounded-full border border-pulse bg-slate-900 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white"
+      : "rounded-full border border-line bg-slate-950/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-300";
+    button.textContent = `${tag} · ${count}`;
+    item.append(button);
+    tagStatsList.append(item);
   }
 }
 
