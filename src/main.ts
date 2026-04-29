@@ -2195,6 +2195,7 @@ function resetAllLocalData() {
 }
 
 function shouldAutoPause(): boolean {
+  return false;
   if (!getGameScene() || runPaused) return false;
   if (upgradeScreen.classList.contains("hidden") === false || tutorialScreen.classList.contains("hidden") === false || gameOver.classList.contains("hidden") === false || menu.classList.contains("hidden") === false) {
     return false;

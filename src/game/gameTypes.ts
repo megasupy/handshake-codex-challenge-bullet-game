@@ -32,4 +32,14 @@ export type AutoplayerTelemetry = {
   pickupTargetY: number | null;
   pickupTargetValue: number;
   decisionTimeMs: number;
+  lookaheadRisk: number;
+  dashCurrentRisk: number;
+  dashProjectedRisk: number;
+  dashImmediateRisk: number;
+  dashWouldUse: boolean;
+  safeDirections: number;
+  selectedDirectionRisk: number;
+  bestAlternativeRisk: number;
+  riskGap: number;
+  incomingDensity: number;
 };

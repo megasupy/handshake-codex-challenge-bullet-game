@@ -44,7 +44,8 @@ try {
 
   for (let i = 0; i < runs; i += 1) {
     const seed = seedBase || `auto-${Date.now().toString(36)}-${i}`;
-    const runId = `run-${seed}`;
+    const startedAt = Date.now();
+    const runId = `run-${seed}-${startedAt}-${i}`;
     const url = new URL(`http://127.0.0.1:${port}/`);
     url.searchParams.set("autorun", "1");
     url.searchParams.set("autoplayer", "1");

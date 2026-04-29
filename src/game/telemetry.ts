@@ -40,6 +40,16 @@ export type TelemetrySample = {
   dashReady: boolean;
   frameMs: number;
   decisionTimeMs: number;
+  lookaheadRisk: number;
+  dashCurrentRisk: number;
+  dashProjectedRisk: number;
+  dashImmediateRisk: number;
+  dashWouldUse: boolean;
+  safeDirections: number;
+  selectedDirectionRisk: number;
+  bestAlternativeRisk: number;
+  riskGap: number;
+  incomingDensity: number;
   edgeDistance: number;
   reason: string;
   playerDamage: number;
@@ -154,6 +164,15 @@ export class TelemetryRecorder {
       `projDanger=${sample.projectedDanger}`,
       `decisionMs=${sample.decisionTimeMs}`,
       `reason=${sample.reason}`,
+      `lookahead=${sample.lookaheadRisk}`,
+      `dashRisk=${sample.dashCurrentRisk}->${sample.dashProjectedRisk}`,
+      `dashImm=${sample.dashImmediateRisk}`,
+      `dashUse=${sample.dashWouldUse ? 1 : 0}`,
+      `safeDirs=${sample.safeDirections}`,
+      `selRisk=${sample.selectedDirectionRisk}`,
+      `altRisk=${sample.bestAlternativeRisk}`,
+      `riskGap=${sample.riskGap}`,
+      `inDensity=${sample.incomingDensity}`,
       `pDmg=${sample.playerDamage}`,
       `pProj=${sample.playerProjectiles}`,
       `pRate=${sample.playerFireRate}`,
@@ -182,6 +201,16 @@ export function toAutoplayerSample(snapshot: AutoplayerTelemetry) {
     nearestEnemyDistance: sanitizeDistance(round(snapshot.nearestEnemyDistance)),
     pickupTargetValue: snapshot.pickupTargetValue,
     decisionTimeMs: round(snapshot.decisionTimeMs),
+    lookaheadRisk: round(snapshot.lookaheadRisk),
+    dashCurrentRisk: round(snapshot.dashCurrentRisk),
+    dashProjectedRisk: round(snapshot.dashProjectedRisk),
+    dashImmediateRisk: round(snapshot.dashImmediateRisk),
+    dashWouldUse: snapshot.dashWouldUse,
+    safeDirections: snapshot.safeDirections,
+    selectedDirectionRisk: round(snapshot.selectedDirectionRisk),
+    bestAlternativeRisk: round(snapshot.bestAlternativeRisk),
+    riskGap: round(snapshot.riskGap),
+    incomingDensity: snapshot.incomingDensity,
     reason: snapshot.reason,
   };
 }

@@ -28,6 +28,16 @@ export class Autoplayer {
     pickupTargetY: null,
     pickupTargetValue: 0,
     decisionTimeMs: 0,
+    lookaheadRisk: 0,
+    dashCurrentRisk: 0,
+    dashProjectedRisk: 0,
+    dashImmediateRisk: 0,
+    dashWouldUse: false,
+    safeDirections: 0,
+    selectedDirectionRisk: 0,
+    bestAlternativeRisk: 0,
+    riskGap: 0,
+    incomingDensity: 0,
   };
 
   reset(): void {
@@ -48,6 +58,16 @@ export class Autoplayer {
       pickupTargetY: null,
       pickupTargetValue: 0,
       decisionTimeMs: 0,
+      lookaheadRisk: 0,
+      dashCurrentRisk: 0,
+      dashProjectedRisk: 0,
+      dashImmediateRisk: 0,
+      dashWouldUse: false,
+      safeDirections: 0,
+      selectedDirectionRisk: 0,
+      bestAlternativeRisk: 0,
+      riskGap: 0,
+      incomingDensity: 0,
     };
   }
 
@@ -58,6 +78,7 @@ export class Autoplayer {
     enemyBullets: Phaser.Physics.Arcade.Group;
     pickups: Phaser.Physics.Arcade.Group;
     speed: number;
+    bossActive?: boolean;
   }): Phaser.Math.Vector2 {
     if (args.elapsedMs < this.nextDecisionAt) return this.targetPosition.clone();
 
@@ -93,6 +114,8 @@ export class Autoplayer {
     }
     let bestDirection = AUTOPLAYER_DIRECTIONS[0];
     let bestScore = Number.POSITIVE_INFINITY;
+    let secondBestScore = Number.POSITIVE_INFINITY;
+    let safeDirections = 0;
 
     for (const direction of AUTOPLAYER_DIRECTIONS) {
       let score = 0;
@@ -125,10 +148,14 @@ export class Autoplayer {
         const pickupBias = activeBulletCount > 10 ? 1.2 : 2.8;
         score -= Math.max(0, direction.dot(directPickupDirection)) * pickupBias;
       }
+      if (score < 28) safeDirections += 1;
 
       if (score < bestScore) {
+        secondBestScore = bestScore;
         bestScore = score;
         bestDirection = direction;
+      } else if (score < secondBestScore) {
+        secondBestScore = score;
       }
     }
 
@@ -154,6 +181,12 @@ export class Autoplayer {
     this.targetPosition.set(projectedX, projectedY);
     const projectedDanger = this.getHazardScoreAt(projectedX, projectedY, args.enemies, args.enemyBullets, args.player);
     this.finishDecision(activePickupTarget ? "scored-pickup" : "scored-survival", currentDanger, projectedDanger, nearestPickupDistance, nearestEnemyDistance, pickupTarget, startedAt);
+    this.lastTelemetry.lookaheadRisk = Math.max(0, bestScore);
+    this.lastTelemetry.safeDirections = safeDirections;
+    this.lastTelemetry.selectedDirectionRisk = Math.max(0, bestScore);
+    this.lastTelemetry.bestAlternativeRisk = Number.isFinite(secondBestScore) ? Math.max(0, secondBestScore) : Math.max(0, bestScore);
+    this.lastTelemetry.riskGap = this.lastTelemetry.selectedDirectionRisk - this.lastTelemetry.bestAlternativeRisk;
+    this.lastTelemetry.incomingDensity = this.getIncomingDensity(args.player.x, args.player.y, args.enemyBullets);
     this.nextDecisionAt = args.elapsedMs + AUTOPLAYER_DECISION_INTERVAL_MS;
     return this.targetPosition.clone();
   }
@@ -176,7 +209,15 @@ export class Autoplayer {
     const dashY = Phaser.Math.Clamp(args.player.y + args.direction.y * args.dashSpeed * 0.25, 22, ARENA_HEIGHT - 22);
     const dashRisk = this.scorePosition(dashX, dashY, horizon, args.enemies, args.enemyBullets, null, args.player);
     const immediateRisk = this.getImmediateInterceptRisk(args.player, args.direction, args.dashSpeed * 0.5, args.enemyBullets);
-    return (currentRisk > 28 && dashRisk + 10 < currentRisk) || (immediateRisk > 170 && dashRisk + 20 < currentRisk + immediateRisk * 0.08);
+    const wouldUse = (currentRisk > 28 && dashRisk + 10 < currentRisk) || (immediateRisk > 170 && dashRisk + 20 < currentRisk + immediateRisk * 0.08);
+    this.lastTelemetry = {
+      ...this.lastTelemetry,
+      dashCurrentRisk: currentRisk,
+      dashProjectedRisk: dashRisk,
+      dashImmediateRisk: immediateRisk,
+      dashWouldUse: wouldUse,
+    };
+    return wouldUse;
   }
 
   private scorePosition(
@@ -488,7 +529,29 @@ export class Autoplayer {
       pickupTargetY: pickupTarget?.y ?? null,
       pickupTargetValue: Number(pickupTarget?.getData("value") || 0),
       decisionTimeMs: performance.now() - startedAt,
+      lookaheadRisk: this.lastTelemetry.lookaheadRisk,
+      dashCurrentRisk: this.lastTelemetry.dashCurrentRisk,
+      dashProjectedRisk: this.lastTelemetry.dashProjectedRisk,
+      dashImmediateRisk: this.lastTelemetry.dashImmediateRisk,
+      dashWouldUse: this.lastTelemetry.dashWouldUse,
+      safeDirections: this.lastTelemetry.safeDirections,
+      selectedDirectionRisk: this.lastTelemetry.selectedDirectionRisk,
+      bestAlternativeRisk: this.lastTelemetry.bestAlternativeRisk,
+      riskGap: this.lastTelemetry.riskGap,
+      incomingDensity: this.lastTelemetry.incomingDensity,
     };
+  }
+
+  private getIncomingDensity(x: number, y: number, enemyBullets: Phaser.Physics.Arcade.Group): number {
+    let count = 0;
+    const entries = enemyBullets.children.entries as Phaser.Physics.Arcade.Image[];
+    const step = entries.length <= AUTOPLAYER_BULLET_SCAN_LIMIT ? 1 : Math.ceil(entries.length / AUTOPLAYER_BULLET_SCAN_LIMIT);
+    for (let i = 0; i < entries.length; i += step) {
+      const bullet = entries[i];
+      if (!bullet?.active) continue;
+      if (Phaser.Math.Distance.Between(x, y, bullet.x, bullet.y) < 220) count += 1;
+    }
+    return count;
   }
 
   private getNearestEnemyDistance(x: number, y: number, enemies: Phaser.Physics.Arcade.Group): number {
