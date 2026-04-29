@@ -40,6 +40,7 @@ export class GameScene extends Phaser.Scene {
   private dashAt = 0;
   private dashUntil = 0;
   private dashVector = new Phaser.Math.Vector2(1, 0);
+  private lastManualDirection = new Phaser.Math.Vector2(1, 0);
   private pausedForUpgrade = false;
   private nextUpgradeAt = UPGRADE_INTERVAL_MS;
   private nextBossAt = FIRST_BOSS_AT_MS;
@@ -284,7 +285,9 @@ export class GameScene extends Phaser.Scene {
   private getManualDirection() {
     const x = Number(this.cursors.right.isDown || this.wasd.D.isDown) - Number(this.cursors.left.isDown || this.wasd.A.isDown);
     const y = Number(this.cursors.down.isDown || this.wasd.S.isDown) - Number(this.cursors.up.isDown || this.wasd.W.isDown);
-    return new Phaser.Math.Vector2(x, y).normalize();
+    const direction = new Phaser.Math.Vector2(x, y).normalize();
+    if (direction.lengthSq() > 0) this.lastManualDirection.copy(direction);
+    return direction;
   }
 
   private getAutoplayerDirection() {
@@ -300,8 +303,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shouldDash(direction: Phaser.Math.Vector2) {
-    if (this.elapsedMs < this.dashAt || direction.lengthSq() === 0) return false;
-    if (!this.debug.autoplayer) return Phaser.Input.Keyboard.JustDown(this.wasd.SPACE);
+    if (this.elapsedMs < this.dashAt) return false;
+    if (!this.debug.autoplayer) {
+      if (!Phaser.Input.Keyboard.JustDown(this.wasd.SPACE)) return false;
+      return direction.lengthSq() > 0 || this.lastManualDirection.lengthSq() > 0;
+    }
+    if (direction.lengthSq() === 0) return false;
     const dashSpeed = 760;
     return this.autoplayer.shouldDash({
       player: this.player,
@@ -313,7 +320,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private startDash(direction: Phaser.Math.Vector2) {
-    this.dashVector.copy(direction);
+    if (!this.debug.autoplayer && direction.lengthSq() === 0) this.dashVector.copy(this.lastManualDirection);
+    else this.dashVector.copy(direction);
     this.dashUntil = this.elapsedMs + 155;
     this.dashAt = this.elapsedMs + this.stats.dashCooldown;
     this.telemetry?.logEvent(this.elapsedMs, "dash", { x: round(this.player.x), y: round(this.player.y) });
@@ -357,11 +365,17 @@ export class GameScene extends Phaser.Scene {
       return Array.from({ length: count }, (_, index) => baseAngle + (index - half) * spread);
     }
 
-    const shots = [baseAngle, baseAngle];
-    const pairs = Math.max(0, (count - 2) / 2);
-    for (let i = 1; i <= pairs; i += 1) {
-      shots.unshift(baseAngle - i * spread);
-      shots.push(baseAngle + i * spread);
+    const shots: number[] = [];
+    const half = count / 2;
+    const centerOffset = spread * 0.08;
+    for (let i = 0; i < half; i += 1) {
+      const lane = half - i - 0.5;
+      const offset = lane * spread;
+      if (i === half - 1) {
+        shots.push(baseAngle - centerOffset, baseAngle + centerOffset);
+      } else {
+        shots.push(baseAngle - offset, baseAngle + offset);
+      }
     }
     return shots;
   }

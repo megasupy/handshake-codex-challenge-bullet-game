@@ -41,7 +41,7 @@ export class Autoplayer {
 
     const startedAt = performance.now();
     this.bulletSampleOffset += 1;
-    const horizons = [0.14, 0.3, 0.5, 0.75, 1.05];
+    const horizons = [0.08, 0.18, 0.34, 0.58, 0.9, 1.2];
     const activeBulletCount = args.enemyBullets.countActive(true);
     const activeEnemyCount = args.enemies.countActive(true);
     const pickupTarget = this.choosePickupTarget(args.player, args.pickups, args.enemyBullets, args.enemies);
@@ -52,7 +52,7 @@ export class Autoplayer {
     const nearestEnemyDistance = this.getNearestEnemyDistance(args.player.x, args.player.y, args.enemies);
     const nearestPickupDistance = pickupTarget ? Phaser.Math.Distance.Between(args.player.x, args.player.y, pickupTarget.x, pickupTarget.y) : Number.POSITIVE_INFINITY;
     const edgeDistance = Math.min(args.player.x, ARENA_WIDTH - args.player.x, args.player.y, ARENA_HEIGHT - args.player.y);
-    const prioritizeSurvival = currentDanger >= 1.25 || activeBulletCount >= 6 || activeEnemyCount >= 7;
+    const prioritizeSurvival = currentDanger >= 1.05 || activeBulletCount >= 5 || activeEnemyCount >= 6;
     const activePickupTarget = prioritizeSurvival ? null : pickupTarget;
 
     if (
@@ -74,18 +74,26 @@ export class Autoplayer {
     for (const direction of AUTOPLAYER_DIRECTIONS) {
       let score = 0;
       for (const horizon of horizons) {
-        const weight = horizon < 0.2 ? 2.1 : horizon < 0.55 ? 1.35 : 0.72;
+        const weight = horizon < 0.12 ? 3.8 : horizon < 0.25 ? 2.5 : horizon < 0.6 ? 1.45 : 0.75;
         const x = Phaser.Math.Clamp(args.player.x + direction.x * args.speed * horizon, 22, ARENA_WIDTH - 22);
         const y = Phaser.Math.Clamp(args.player.y + direction.y * args.speed * horizon, 22, ARENA_HEIGHT - 22);
         score += this.scorePosition(x, y, horizon, args.enemies, args.enemyBullets, activePickupTarget, args.player) * weight;
       }
+      score += this.getImmediateInterceptRisk(args.player, direction, args.speed, args.enemyBullets) * 0.72;
 
       if (direction.lengthSq() > 0 && direction.dot(this.direction) < -0.25) {
         score += 0.35;
       }
+      if (direction.lengthSq() > 0) {
+        const nextX = Phaser.Math.Clamp(args.player.x + direction.x * 42, 22, ARENA_WIDTH - 22);
+        const nextY = Phaser.Math.Clamp(args.player.y + direction.y * 42, 22, ARENA_HEIGHT - 22);
+        const nextEdge = Math.min(nextX, ARENA_WIDTH - nextX, nextY, ARENA_HEIGHT - nextY);
+        if (nextEdge < 72) score += ((72 - nextEdge) / 72) * 22;
+      }
       if (direction.lengthSq() === 0) {
         if (nearestEnemyDistance < 240) score += 36;
         else if (activeEnemyCount > 4) score += 14;
+        if (!activePickupTarget && currentDanger < 1.15 && activeBulletCount < 10) score += 12;
       }
       if (activePickupTarget && direction.lengthSq() === 0 && this.getHazardScoreAt(args.player.x, args.player.y, args.enemies, args.enemyBullets, args.player) < 2.5) {
         score += 8;
@@ -130,12 +138,13 @@ export class Autoplayer {
     dashSpeed: number;
   }): boolean {
     if (args.direction.lengthSq() === 0) return false;
-    const horizon = 0.32;
+    const horizon = 0.4;
     const currentRisk = this.scorePosition(args.player.x, args.player.y, horizon, args.enemies, args.enemyBullets, null, args.player);
     const dashX = Phaser.Math.Clamp(args.player.x + args.direction.x * args.dashSpeed * 0.25, 22, ARENA_WIDTH - 22);
     const dashY = Phaser.Math.Clamp(args.player.y + args.direction.y * args.dashSpeed * 0.25, 22, ARENA_HEIGHT - 22);
     const dashRisk = this.scorePosition(dashX, dashY, horizon, args.enemies, args.enemyBullets, null, args.player);
-    return currentRisk > 38 && dashRisk + 16 < currentRisk;
+    const immediateRisk = this.getImmediateInterceptRisk(args.player, args.direction, args.dashSpeed * 0.5, args.enemyBullets);
+    return (currentRisk > 28 && dashRisk + 10 < currentRisk) || (immediateRisk > 170 && dashRisk + 20 < currentRisk + immediateRisk * 0.08);
   }
 
   private scorePosition(
@@ -166,6 +175,7 @@ export class Autoplayer {
     score += this.getBulletRiskAt(x, y, horizonSeconds, enemyBullets);
     score += this.getEnemyRiskAt(x, y, horizonSeconds, enemies, player);
     score += this.getEscapePenaltyAt(x, y, enemies, enemyBullets, player);
+    score -= this.getOpenAreaScore(x, y, enemies, enemyBullets, player) * 1.8;
     const immediateHazard = this.getHazardScoreAt(x, y, enemies, enemyBullets, player);
 
     if (!pickupTarget || immediateHazard > 3.5) {
@@ -316,6 +326,25 @@ export class Autoplayer {
     return risk;
   }
 
+  private getOpenAreaScore(
+    x: number,
+    y: number,
+    enemies: Phaser.Physics.Arcade.Group,
+    enemyBullets: Phaser.Physics.Arcade.Group,
+    player: Phaser.GameObjects.Shape,
+  ): number {
+    let safe = 0;
+    const probeDistance = 96;
+    for (const direction of AUTOPLAYER_DIRECTIONS) {
+      if (direction.lengthSq() === 0) continue;
+      const probeX = Phaser.Math.Clamp(x + direction.x * probeDistance, 22, ARENA_WIDTH - 22);
+      const probeY = Phaser.Math.Clamp(y + direction.y * probeDistance, 22, ARENA_HEIGHT - 22);
+      const risk = this.getBulletRiskAt(probeX, probeY, 0.34, enemyBullets) + this.getEnemyRiskAt(probeX, probeY, 0.34, enemies, player);
+      if (risk < 20) safe += 1;
+    }
+    return safe / 8;
+  }
+
   private getEnemyRiskAt(x: number, y: number, horizonSeconds: number, enemies: Phaser.Physics.Arcade.Group, player: Phaser.GameObjects.Shape): number {
     let risk = 0;
     const entries = enemies.children.entries as Phaser.GameObjects.Shape[];
@@ -362,6 +391,42 @@ export class Autoplayer {
     if (safeDirections <= 3) return 16;
     if (safeDirections <= 5) return 5;
     return 0;
+  }
+
+  private getImmediateInterceptRisk(
+    player: Phaser.GameObjects.Shape,
+    direction: Phaser.Math.Vector2,
+    speed: number,
+    enemyBullets: Phaser.Physics.Arcade.Group,
+  ): number {
+    if (direction.lengthSq() === 0) return 18;
+    let risk = 0;
+    const moveVx = direction.x * speed;
+    const moveVy = direction.y * speed;
+    const entries = enemyBullets.children.entries as Phaser.Physics.Arcade.Image[];
+    const step = entries.length <= AUTOPLAYER_BULLET_SCAN_LIMIT ? 1 : Math.ceil(entries.length / AUTOPLAYER_BULLET_SCAN_LIMIT);
+    const start = step > 1 ? (this.bulletSampleOffset + 1) % step : 0;
+
+    for (let i = start; i < entries.length; i += step) {
+      const bullet = entries[i];
+      if (!bullet?.active) continue;
+      const body = bullet.body as Phaser.Physics.Arcade.Body;
+      const rvx = body.velocity.x - moveVx;
+      const rvy = body.velocity.y - moveVy;
+      const rx = player.x - bullet.x;
+      const ry = player.y - bullet.y;
+      const relSpeedSq = rvx * rvx + rvy * rvy;
+      const t = relSpeedSq > 0 ? Phaser.Math.Clamp((rx * rvx + ry * rvy) / relSpeedSq, 0, 0.28) : 0;
+      const cx = bullet.x + body.velocity.x * t;
+      const cy = bullet.y + body.velocity.y * t;
+      const px = player.x + moveVx * t;
+      const py = player.y + moveVy * t;
+      const dist = Phaser.Math.Distance.Between(px, py, cx, cy);
+
+      if (dist < 34) risk += 230 + (34 - dist) * 20;
+      else if (dist < 76) risk += ((76 - dist) / 76) * 72;
+    }
+    return risk;
   }
 
   private finishDecision(
