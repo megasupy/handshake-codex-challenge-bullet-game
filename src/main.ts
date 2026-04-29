@@ -147,6 +147,7 @@ const runStyle = mustGet("run-style");
 const runDamage = mustGet("run-damage");
 const runUpgradePath = mustGet("run-upgrade-path");
 const runAdvice = mustGet("run-advice");
+const runBreakdown = mustGet("run-breakdown");
 const runComparison = mustGet("run-comparison");
 const runSeed = mustGet("run-seed");
 const leaderboardList = mustGet("leaderboard-list");
@@ -674,6 +675,7 @@ gameEvents.addEventListener("game-over", (event) => {
   renderRunDamage(lastRun);
   renderRunUpgradePath(lastRun);
   renderRunAdvice(lastRun);
+  renderRunBreakdown(lastRun);
   renderRunComparison(lastRun, previousRecords);
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
@@ -1502,6 +1504,17 @@ function renderRunAdvice(run: RunSummary) {
   runAdvice.textContent = advice;
 }
 
+function renderRunBreakdown(run: RunSummary) {
+  runBreakdown.innerHTML = "";
+  const breakdown = getBuildBreakdown(run);
+  for (const [label, value] of Object.entries(breakdown)) {
+    const item = document.createElement("div");
+    item.className = "debug-stat";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(value)}</strong>`;
+    runBreakdown.append(item);
+  }
+}
+
 function renderRunComparison(run: RunSummary, previous: RecordsState) {
   runComparison.innerHTML = "";
   const rows: Array<[string, string | number]> = [
@@ -1933,9 +1946,43 @@ function buildRunReport(run: RunSummary): string {
     `damageBossContact: ${run.damageBossContact ?? 0}`,
     `upgradePath: ${(run.upgradePath || []).join(" > ") || "none"}`,
     `advice: ${getRunAdvice(run)}`,
+    `breakdown: ${Object.entries(getBuildBreakdown(run)).map(([label, value]) => `${label}=${value}`).join(" ")}`,
     `build: dmg=${run.playerDamage ?? 0} proj=${run.playerProjectiles ?? 0} rate=${run.playerFireRate ?? 0} pierce=${run.playerPierce ?? 0} speed=${run.playerProjectileSpeed ?? 0}`,
   ];
   return lines.join("\n");
+}
+
+function getBuildBreakdown(run: RunSummary): Record<string, string> {
+  const damage = run.playerDamage ?? 1;
+  const projectiles = run.playerProjectiles ?? 1;
+  const fireRate = run.playerFireRate ?? 0;
+  const pierce = run.playerPierce ?? 0;
+  const speed = run.speed ?? 0;
+  const health = run.maxHealth ?? 3;
+  const pickup = (run.upgradePath || []).some((entry) => /Collector|Vacuum|Patch/.test(entry));
+
+  const offense = damage >= 5 || projectiles >= 4 || fireRate <= 140
+    ? "High"
+    : damage >= 3 || projectiles >= 2
+      ? "Mid"
+      : "Low";
+  const mobility = speed >= 300 || (run.upgradePath || []).some((entry) => /Thrusters|Blink/.test(entry))
+    ? "High"
+    : speed >= 250
+      ? "Mid"
+      : "Low";
+  const defense = health >= 5 || (run.damageTaken ?? 0) <= 2
+    ? "High"
+    : health >= 4
+      ? "Mid"
+      : "Low";
+  const utility = pickup || pierce >= 2
+    ? "High"
+    : pierce > 0
+      ? "Mid"
+      : "Low";
+
+  return { offense, mobility, defense, utility };
 }
 
 function getRunAdvice(run: RunSummary): string {
