@@ -21,6 +21,8 @@ import type { TelemetryConfig, TelemetryRun } from "./game/telemetry";
 
 const AUTOPLAYER_KEY = "storm_debug_autoplayer_v1";
 const LEADERBOARD_MODE_KEY = "storm_leaderboard_mode_v1";
+const RUN_SEARCH_KEY = "storm_run_search_v1";
+const TELEMETRY_FILTER_KEY = "storm_telemetry_filter_v1";
 const query = new URLSearchParams(window.location.search);
 const automationConfig = getAutomationConfig();
 
@@ -207,9 +209,9 @@ let currentBossHudState: BossHudPayload | null = null;
 let currentLeaderboardRows: RunRecord[] = [];
 let selectedRecentRun: RunRecord | null = null;
 let selectedBoardRun: RunRecord | null = null;
-let telemetryFilterValue = "";
+let telemetryFilterValue = readStoredText(TELEMETRY_FILTER_KEY);
 let selectedTelemetryRunId: string | null = null;
-let runSearchValue = "";
+let runSearchValue = readStoredText(RUN_SEARCH_KEY);
 let pendingKeybindAction: KeybindAction | null = null;
 let runPaused = false;
 let toastId = 0;
@@ -223,8 +225,8 @@ renderSettingsPresetPanel();
 renderFullscreenUi();
 tutorialDontShow.checked = !currentTutorial.seen;
 renderKeybindsPanel();
-telemetryFilter.value = "";
-runSearch.value = "";
+telemetryFilter.value = telemetryFilterValue;
+runSearch.value = runSearchValue;
 refreshDailySeedUi();
 
 playButton.addEventListener("click", () => startRun("endless"));
@@ -447,12 +449,14 @@ telemetryArchiveList.addEventListener("click", (event) => {
 });
 telemetryFilter.addEventListener("input", () => {
   telemetryFilterValue = telemetryFilter.value.trim().toLowerCase();
+  writeStoredText(TELEMETRY_FILTER_KEY, telemetryFilterValue);
   renderTelemetryArchive();
   renderTelemetryTimeline();
   renderRunFeed();
 });
 runSearch.addEventListener("input", () => {
   runSearchValue = runSearch.value.trim().toLowerCase();
+  writeStoredText(RUN_SEARCH_KEY, runSearchValue);
   renderRecentRunsPanel();
   renderLeaderboard({ source: leaderboardSource.textContent === "Online" ? "remote" : "local", rows: currentLeaderboardRows });
 });
@@ -1557,6 +1561,8 @@ function resetAllLocalData() {
     "storm_keybinds_v1",
     "storm_runs_v1",
     "storm_pinned_runs_v1",
+    "storm_run_search_v1",
+    "storm_telemetry_filter_v1",
     "storm_telemetry_archive_v1",
     "storm_checkpoint_v1",
     "storm_player_name_v1",
@@ -1577,7 +1583,11 @@ function resetAllLocalData() {
   currentTelemetryArchive = readTelemetryArchive();
   currentTutorial = readTutorialState();
   selectedTelemetryRunId = null;
+  telemetryFilterValue = "";
+  runSearchValue = "";
   playerNameInput.value = getSavedName();
+  telemetryFilter.value = "";
+  runSearch.value = "";
   applyPreferencesToUi(currentPreferences);
   renderSettingsPresetPanel();
   renderProgressionPanel();
@@ -1774,6 +1784,23 @@ function getFilteredTelemetryEntries(): TelemetryArchiveEntry[] {
   return telemetryFilterValue
     ? currentTelemetryArchive.filter((entry) => matchesTelemetryEntry(entry, telemetryFilterValue))
     : currentTelemetryArchive;
+}
+
+function readStoredText(key: string): string {
+  try {
+    return localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredText(key: string, value: string): void {
+  try {
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 function readLeaderboardMode(): GameMode {
