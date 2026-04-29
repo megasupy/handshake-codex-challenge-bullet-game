@@ -1,7 +1,7 @@
 import type { RunRecord } from "../types";
 import type { CheckpointState } from "./checkpoint";
 import { clearCheckpoint, writeCheckpoint } from "./checkpoint";
-import { readRuns, saveName, writeRuns } from "./localRuns";
+import { readPinnedRunIds, readRuns, saveName, writePinnedRunIds, writeRuns } from "./localRuns";
 import { readPreferences, writePreferences, type PreferencesState } from "./preferences";
 import { readSelectedSettingsPreset, writeSelectedSettingsPreset, type SettingsPresetId } from "./settingsPresets";
 import { readProgression, writeProgression, type ProgressionState } from "./progression";
@@ -25,6 +25,7 @@ export type ProfileBackup = {
   tutorial: TutorialState;
   keybinds: KeybindState;
   runs: RunRecord[];
+  pinnedRunIds: string[];
   telemetryArchive: TelemetryArchiveEntry[];
   checkpoint: CheckpointState | null;
 };
@@ -42,6 +43,7 @@ export function exportProfileBackup(): ProfileBackup {
     tutorial: readTutorialState(),
     keybinds: readKeybinds(),
     runs: readRuns(),
+    pinnedRunIds: readPinnedRunIds(),
     telemetryArchive: readTelemetryArchive(),
     checkpoint: readCheckpointSafe(),
   };
@@ -64,6 +66,7 @@ export function importProfileBackup(raw: string): { ok: boolean; error?: string 
     if (parsed.keybinds) writeKeybinds(parsed.keybinds);
     else resetKeybinds();
     if (Array.isArray(parsed.runs)) writeRuns(parsed.runs);
+    if (Array.isArray(parsed.pinnedRunIds)) writePinnedRunIds(parsed.pinnedRunIds.map((id) => String(id)));
     if (Array.isArray(parsed.telemetryArchive)) replaceTelemetryArchive(parsed.telemetryArchive);
     if (parsed.checkpoint === null) clearCheckpoint();
     else if (parsed.checkpoint) writeCheckpoint(parsed.checkpoint);

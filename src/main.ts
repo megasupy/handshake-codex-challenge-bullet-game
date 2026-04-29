@@ -6,7 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from "./game/constants";
 import { gameEvents, type AutomationCompletePayload, type AutomationSnapshotPayload, type BossHudPayload, type DebugSettings, type DebugStats, type HudPayload, type UpgradeOption } from "./game/events";
 import { getLeaderboard, submitRun, syncPendingRuns } from "./services/leaderboard";
 import { clearCheckpoint, describeCheckpoint, readCheckpoint } from "./services/checkpoint";
-import { getPendingRuns, getSavedName, readRuns } from "./services/localRuns";
+import { getPendingRuns, getSavedName, isRunPinned, readRuns, sortRunsWithPinned, toggleRunPinned } from "./services/localRuns";
 import { formatKeybindSummary, readKeybinds, resetKeybinds, updateKeybind, type KeybindAction, type KeybindState } from "./services/keybinds";
 import { exportProfileBackup, importProfileBackup } from "./services/profileBackup";
 import { formatTutorialSummary, markTutorialSeen, readTutorialState, type TutorialState } from "./services/tutorial";
@@ -64,6 +64,7 @@ const recentRunsSummary = mustGet("recent-runs-summary");
 const recentRunsList = mustGet("recent-runs-list");
 const selectedRunSync = mustGet("selected-run-sync");
 const selectedRunSummary = mustGet("selected-run-summary");
+const selectedRunPin = mustGetButton("selected-run-pin");
 const selectedRunReplay = mustGetButton("selected-run-replay");
 const selectedRunCopySeed = mustGetButton("selected-run-copy-seed");
 const selectedRunCopyLink = mustGetButton("selected-run-copy-link");
@@ -139,6 +140,7 @@ const leaderboardModeDaily = mustGetButton("leaderboard-mode-daily");
 const leaderboardRefresh = mustGetButton("leaderboard-refresh");
 const selectedBoardSync = mustGet("selected-board-sync");
 const selectedBoardSummary = mustGet("selected-board-summary");
+const selectedBoardPin = mustGetButton("selected-board-pin");
 const selectedBoardReplay = mustGetButton("selected-board-replay");
 const selectedBoardCopySeed = mustGetButton("selected-board-copy-seed");
 const selectedBoardCopyLink = mustGetButton("selected-board-copy-link");
@@ -299,6 +301,12 @@ selectedRunReplay.addEventListener("click", () => {
   if (!selectedRecentRun) return;
   startRun(selectedRecentRun.mode, null, selectedRecentRun.seed);
 });
+selectedRunPin.addEventListener("click", () => {
+  if (!selectedRecentRun) return;
+  toggleRunPinned(selectedRecentRun.id);
+  renderRecentRunsPanel();
+  renderSelectedRunPanel();
+});
 selectedRunCopySeed.addEventListener("click", async () => {
   if (!selectedRecentRun) return;
   try {
@@ -345,6 +353,12 @@ leaderboardList.addEventListener("click", (event) => {
 selectedBoardReplay.addEventListener("click", () => {
   if (!selectedBoardRun) return;
   startRun(selectedBoardRun.mode, null, selectedBoardRun.seed);
+});
+selectedBoardPin.addEventListener("click", () => {
+  if (!selectedBoardRun) return;
+  toggleRunPinned(selectedBoardRun.id);
+  renderRecentRunsPanel();
+  renderSelectedBoardPanel();
 });
 selectedBoardCopySeed.addEventListener("click", async () => {
   if (!selectedBoardRun) return;
@@ -907,6 +921,8 @@ function renderRecordsPanel() {
 function renderSelectedRunPanel() {
   const run = selectedRecentRun;
   selectedRunSync.textContent = run?.synced ? "Synced" : run ? "Local" : "None";
+  selectedRunPin.textContent = run ? (isRunPinned(run.id) ? "Unpin" : "Pin") : "Pin";
+  selectedRunPin.disabled = !run;
   selectedRunSummary.innerHTML = "";
 
   const rows: Record<string, string | number> = run
@@ -937,7 +953,7 @@ function renderSelectedRunPanel() {
 
 function renderRecentRunsPanel() {
   const allRuns = readRuns();
-  const runs = filterRuns(allRuns);
+  const runs = filterRuns(sortRunsWithPinned(allRuns));
   recentRunsCount.textContent = runSearchValue ? `${runs.length}/${allRuns.length} run${allRuns.length === 1 ? "" : "s"}` : `${runs.length} run${runs.length === 1 ? "" : "s"}`;
   recentRunsSummary.textContent = runs.length > 0
     ? runSearchValue
@@ -966,7 +982,7 @@ function renderRecentRunsPanel() {
       : "rounded-md border border-line bg-slate-950/60 px-3 py-3 text-sm text-slate-300";
     item.dataset.runId = run.id;
     item.innerHTML = `
-      <strong class="block truncate text-white">${escapeHtml(run.playerName)}</strong>
+      <strong class="block truncate text-white">${isRunPinned(run.id) ? "★ " : ""}${escapeHtml(run.playerName)}</strong>
       <span class="mt-1 block text-xs leading-5 text-slate-400">${run.mode.toUpperCase()} · ${(run.survivalMs / 1000).toFixed(1)}s · ${run.score.toLocaleString()} pts</span>
     `;
     recentRunsList.append(item);
@@ -981,6 +997,8 @@ function renderRecentRunsPanel() {
 function renderSelectedBoardPanel() {
   const run = selectedBoardRun;
   selectedBoardSync.textContent = run?.synced ? "Synced" : run ? "Local" : "None";
+  selectedBoardPin.textContent = run ? (isRunPinned(run.id) ? "Unpin" : "Pin") : "Pin";
+  selectedBoardPin.disabled = !run;
   selectedBoardSummary.innerHTML = "";
 
   const rows: Record<string, string | number> = run
@@ -1449,6 +1467,7 @@ function resetAllLocalData() {
     "storm_tutorial_seen_v1",
     "storm_keybinds_v1",
     "storm_runs_v1",
+    "storm_pinned_runs_v1",
     "storm_telemetry_archive_v1",
     "storm_checkpoint_v1",
     "storm_player_name_v1",
