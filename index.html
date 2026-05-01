@@ -42,11 +42,10 @@
           <div id="menu-tabs-panel" class="panel w-full max-w-5xl !p-3 sm:!p-4" data-menu-tab="all">
             <div id="menu-tab-nav" class="flex flex-wrap gap-2">
               <button class="btn-secondary px-3 py-2" data-menu-tab-button="home">Home</button>
-              <button class="btn-secondary px-3 py-2" data-menu-tab-button="runs">Runs</button>
-              <button class="btn-secondary px-3 py-2" data-menu-tab-button="history">History</button>
-              <button class="btn-secondary px-3 py-2" data-menu-tab-button="progress">Progress</button>
+              <button class="btn-secondary px-3 py-2" data-menu-tab-button="runs">History</button>
+              <button class="btn-secondary px-3 py-2" data-menu-tab-button="shop">Shop</button>
+              <button class="btn-secondary px-3 py-2" data-menu-tab-button="achievements">Achievements</button>
               <button class="btn-secondary px-3 py-2" data-menu-tab-button="settings">Settings</button>
-              <button class="btn-secondary px-3 py-2" data-menu-tab-button="telemetry">Telemetry</button>
             </div>
           </div>
           <div class="panel max-w-xl" data-menu-tab="home">
@@ -57,50 +56,23 @@
             </p>
             <div class="mt-7 flex flex-wrap gap-3">
               <button id="play-button" class="btn-primary">Play</button>
-              <button id="campaign-button" class="btn-secondary border-cyan-400/40 text-cyan-100">Campaign</button>
               <button id="resume-button" class="btn-secondary" disabled>Resume Run</button>
               <button id="daily-button" class="btn-secondary">Daily Seed</button>
-              <button id="boss-rush-button" class="btn-secondary">Boss Rush</button>
               <button id="tutorial-button" class="btn-secondary">How to Play</button>
             </div>
             <p id="checkpoint-summary" class="mt-3 text-sm leading-6 text-slate-400">No saved run.</p>
             <p id="tutorial-summary" class="mt-2 text-sm leading-6 text-slate-400">Tutorial on startup.</p>
-            <div class="mt-5 rounded-md border border-line bg-slate-950/60 p-4">
-              <div class="flex items-center justify-between gap-3">
-                <strong class="text-sm font-black text-white">Daily Seed</strong>
-                <button id="daily-seed-copy" class="btn-secondary px-3 py-1 text-[10px]">Copy</button>
-              </div>
-              <code id="daily-seed-preview" class="mt-3 block break-all rounded-md border border-line bg-slate-950/80 px-3 py-2 text-xs text-slate-300">daily</code>
-            </div>
-            <label class="mt-4 block text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
-              Run Search
-              <input id="run-search" class="mt-2 w-full rounded-md border border-line bg-slate-950/80 px-3 py-2 text-sm text-white outline-none ring-pulse focus:ring-2" placeholder="player, mode, seed, score..." />
-            </label>
-            <label class="mt-4 block text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
-              Sort Recent Runs
-              <select id="run-sort" class="mt-2 w-full rounded-md border border-line bg-slate-950/80 px-3 py-2 text-sm text-white outline-none ring-pulse focus:ring-2">
-                <option value="best">Best</option>
-                <option value="newest">Newest</option>
-                <option value="score">Score</option>
-                <option value="kills">Kills</option>
-                <option value="survival">Survival</option>
-              </select>
-            </label>
-            <div class="mt-4 rounded-md border border-line bg-slate-950/60 p-4">
-              <div class="flex items-center justify-between gap-3">
-                <strong class="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Tag Filter</strong>
-                <button id="run-tag-filter-clear" class="btn-secondary px-3 py-1 text-[10px]">Clear</button>
-              </div>
-              <p id="run-tag-filter-summary" class="mt-3 text-sm leading-6 text-slate-300">No tag filter active.</p>
-              <div id="run-tag-filter-chips" class="mt-3 flex flex-wrap gap-2"></div>
-            </div>
-            <div class="mt-4 rounded-md border border-line bg-slate-950/60 p-4">
-              <div class="flex items-center justify-between gap-3">
-                <strong class="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Tag Stats</strong>
-                <span id="tag-stats-count" class="rounded-full border border-line px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-pulse">0 tags</span>
-              </div>
-              <p id="tag-stats-summary" class="mt-3 text-sm leading-6 text-slate-300">No tags recorded yet.</p>
-              <ol id="tag-stats-list" class="mt-3 flex flex-wrap gap-2"></ol>
+            <div id="daily-seed-home-hidden" class="hidden">
+              <button id="daily-seed-copy" class="btn-secondary px-3 py-1 text-[10px]">Copy</button>
+              <code id="daily-seed-preview">daily</code>
+              <input id="run-search" />
+              <select id="run-sort"><option value="best">Best</option></select>
+              <button id="run-tag-filter-clear"></button>
+              <p id="run-tag-filter-summary"></p>
+              <div id="run-tag-filter-chips"></div>
+              <span id="tag-stats-count"></span>
+              <p id="tag-stats-summary"></p>
+              <ol id="tag-stats-list"></ol>
             </div>
             <div class="mt-6 flex flex-wrap gap-2 text-sm text-slate-400">
               <span>Move: remappable</span>
@@ -109,7 +81,7 @@
               <span>Debug: backtick</span>
             </div>
           </div>
-          <aside class="panel w-full max-w-md" data-menu-tab="history">
+          <aside class="panel w-full max-w-md hidden" data-menu-tab="history">
             <div class="flex items-center justify-between gap-4">
               <h2 class="text-2xl font-bold text-white">Leaderboard</h2>
               <span id="leaderboard-source" class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">Local</span>
@@ -117,7 +89,6 @@
             <div class="mt-4 flex gap-2">
               <button id="leaderboard-mode-endless" class="btn-primary px-3 py-2">Endless</button>
               <button id="leaderboard-mode-daily" class="btn-secondary px-3 py-2">Daily</button>
-              <button id="leaderboard-mode-campaign" class="btn-secondary px-3 py-2">Campaign</button>
             </div>
             <div class="mt-4 flex flex-wrap gap-2">
               <button id="leaderboard-refresh" class="btn-secondary px-3 py-2">Refresh</button>
@@ -172,27 +143,18 @@
                 <span id="selected-run-sync" class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">None</span>
               </div>
               <div id="selected-run-summary" class="mt-3 grid grid-cols-2 gap-2 text-xs"></div>
-              <div class="mt-4 rounded-md border border-line bg-slate-950/60 p-3">
-                <div class="flex items-center justify-between gap-3">
-                  <strong class="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Run Compare</strong>
-                  <select id="selected-run-compare" class="rounded-md border border-line bg-slate-950/80 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white outline-none ring-pulse focus:ring-2"></select>
-                </div>
-                <div id="selected-run-comparison" class="mt-3 grid grid-cols-2 gap-2 text-xs"></div>
+              <div id="runs-hidden-controls" class="hidden">
+                <select id="selected-run-compare"></select>
+                <div id="selected-run-comparison"></div>
+                <textarea id="selected-run-note"></textarea>
+                <input id="selected-run-tags" />
+                <button id="selected-run-note-save"></button>
+                <button id="selected-run-note-clear"></button>
+                <button id="selected-run-tags-save"></button>
+                <button id="selected-run-tags-clear"></button>
+                <button id="selected-run-pin"></button>
               </div>
-              <label class="mt-4 block text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
-                Run Note
-                <textarea id="selected-run-note" class="mt-2 min-h-24 w-full resize-y rounded-md border border-line bg-slate-950/80 px-3 py-2 text-sm leading-6 text-white outline-none ring-pulse focus:ring-2" maxlength="500" placeholder="Add a note about the build, pathing, or mistakes."></textarea>
-              </label>
-              <label class="mt-4 block text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
-                Tags
-                <input id="selected-run-tags" class="mt-2 w-full rounded-md border border-line bg-slate-950/80 px-3 py-2 text-sm text-white outline-none ring-pulse focus:ring-2" maxlength="120" placeholder="boss, dodge, glass cannon" />
-              </label>
               <div class="mt-4 flex flex-wrap gap-2">
-                <button id="selected-run-pin" class="btn-secondary px-3 py-2">Pin</button>
-                <button id="selected-run-note-save" class="btn-secondary px-3 py-2">Save Note</button>
-                <button id="selected-run-note-clear" class="btn-secondary px-3 py-2">Clear Note</button>
-                <button id="selected-run-tags-save" class="btn-secondary px-3 py-2">Save Tags</button>
-                <button id="selected-run-tags-clear" class="btn-secondary px-3 py-2">Clear Tags</button>
                 <button id="selected-run-replay" class="btn-secondary px-3 py-2">Replay</button>
                 <button id="selected-run-copy-seed" class="btn-secondary px-3 py-2">Copy Seed</button>
                 <button id="selected-run-copy-link" class="btn-secondary px-3 py-2">Copy Link</button>
@@ -200,8 +162,16 @@
                 <button id="selected-run-delete" class="btn-secondary px-3 py-2">Delete</button>
               </div>
             </div>
+            <div class="mt-4 rounded-md border border-line bg-slate-950/60 p-4">
+              <div class="flex items-center justify-between gap-4">
+                <h3 class="text-lg font-bold text-white">Personal Bests</h3>
+                <span class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">Local</span>
+              </div>
+              <p id="records-summary" class="mt-3 text-sm leading-6 text-slate-300">Your best local runs are tracked on this device.</p>
+              <div id="records-stats" class="mt-4 grid grid-cols-2 gap-2 text-xs"></div>
+            </div>
           </aside>
-          <aside class="panel w-full max-w-md" data-menu-tab="progress">
+          <aside class="panel w-full max-w-md" data-menu-tab="achievements">
             <div class="flex items-center justify-between gap-4">
               <h2 class="text-2xl font-bold text-white">Achievements</h2>
               <span id="achievements-count" class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">0/0</span>
@@ -220,12 +190,12 @@
               <button id="sync-now-button" class="btn-secondary px-3 py-2">Sync Now</button>
             </div>
           </aside>
-          <aside class="panel w-full max-w-md" data-menu-tab="progress">
+          <aside class="panel w-full max-w-md" data-menu-tab="shop">
             <div class="flex items-center justify-between gap-4">
-              <h2 class="text-2xl font-bold text-white">Meta Progression</h2>
+              <h2 class="text-2xl font-bold text-white">Shop</h2>
               <span id="progression-shards" class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">0 shards</span>
             </div>
-            <p id="progression-summary" class="mt-3 text-sm leading-6 text-slate-300">Persistent bonuses are saved locally and applied to every future run.</p>
+            <p id="progression-summary" class="mt-3 text-sm leading-6 text-slate-300">Spend shards on permanent upgrades applied to future runs.</p>
             <div id="progression-stats" class="mt-4 grid grid-cols-2 gap-2 text-xs"></div>
             <div id="progression-upgrades" class="mt-4 grid gap-2"></div>
             <div class="mt-4 flex gap-2">
@@ -271,14 +241,6 @@
               <button id="fullscreen-toggle" class="btn-secondary px-3 py-2">Fullscreen</button>
             </div>
           </aside>
-          <aside class="panel w-full max-w-md" data-menu-tab="progress">
-            <div class="flex items-center justify-between gap-4">
-              <h2 class="text-2xl font-bold text-white">Personal Bests</h2>
-              <span class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">Local</span>
-            </div>
-            <p id="records-summary" class="mt-3 text-sm leading-6 text-slate-300">Your best local runs are tracked on this device.</p>
-            <div id="records-stats" class="mt-4 grid grid-cols-2 gap-2 text-xs"></div>
-          </aside>
           <aside class="panel w-full max-w-md" data-menu-tab="settings">
             <div class="flex items-center justify-between gap-4">
               <h2 class="text-2xl font-bold text-white">Keybinds</h2>
@@ -296,7 +258,7 @@
               <button id="keybinds-reset" class="btn-secondary px-3 py-2">Reset Keybinds</button>
             </div>
           </aside>
-          <aside class="panel w-full max-w-md" data-menu-tab="telemetry">
+          <aside class="panel w-full max-w-md hidden" data-menu-tab="telemetry">
             <div class="flex items-center justify-between gap-4">
               <h2 class="text-2xl font-bold text-white">Telemetry Archive</h2>
               <span id="telemetry-archive-count" class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">0 logs</span>
@@ -313,7 +275,7 @@
               <button id="telemetry-archive-clear" class="btn-secondary px-3 py-2">Clear Archive</button>
             </div>
           </aside>
-          <aside class="panel w-full max-w-md" data-menu-tab="telemetry">
+          <aside class="panel w-full max-w-md hidden" data-menu-tab="telemetry">
             <div class="flex items-center justify-between gap-4">
               <h2 class="text-2xl font-bold text-white">Telemetry Timeline</h2>
               <span id="telemetry-timeline-count" class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">0 lines</span>
@@ -321,7 +283,7 @@
             <p id="telemetry-timeline-summary" class="mt-3 text-sm leading-6 text-slate-300">The latest telemetry run is summarized into readable snapshots.</p>
             <ol id="telemetry-timeline-list" class="mt-4 space-y-2"></ol>
           </aside>
-          <aside class="panel w-full max-w-md" data-menu-tab="telemetry">
+          <aside class="panel w-full max-w-md hidden" data-menu-tab="telemetry">
             <div class="flex items-center justify-between gap-4">
               <h2 class="text-2xl font-bold text-white">Run Feed</h2>
               <span id="run-feed-count" class="rounded-full border border-line px-3 py-1 text-xs font-semibold uppercase tracking-wider text-pulse">0 events</span>

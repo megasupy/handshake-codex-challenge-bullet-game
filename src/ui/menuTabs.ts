@@ -1,6 +1,6 @@
-export type MenuTab = "home" | "runs" | "history" | "progress" | "settings" | "telemetry";
+export type MenuTab = "home" | "runs" | "shop" | "achievements" | "settings";
 
-const VALID_MENU_TABS: MenuTab[] = ["home", "runs", "history", "progress", "settings", "telemetry"];
+const VALID_MENU_TABS: MenuTab[] = ["home", "runs", "shop", "achievements", "settings"];
 
 export function normalizeMenuTab(tab: string): MenuTab {
   return VALID_MENU_TABS.includes(tab as MenuTab) ? (tab as MenuTab) : "home";

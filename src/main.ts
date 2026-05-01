@@ -155,7 +155,6 @@ const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
 const leaderboardModeEndless = mustGetButton("leaderboard-mode-endless");
 const leaderboardModeDaily = mustGetButton("leaderboard-mode-daily");
-const leaderboardModeCampaign = mustGetButton("leaderboard-mode-campaign");
 const leaderboardRefresh = mustGetButton("leaderboard-refresh");
 const leaderboardExport = mustGetButton("leaderboard-export");
 const selectedBoardSync = mustGet("selected-board-sync");
@@ -177,8 +176,6 @@ const selectedBoardDelete = mustGetButton("selected-board-delete");
 const playButton = mustGetButton("play-button");
 const resumeButton = mustGetButton("resume-button");
 const dailyButton = mustGetButton("daily-button");
-const campaignButton = mustGetButton("campaign-button");
-const bossRushButton = mustGetButton("boss-rush-button");
 const tutorialButton = mustGetButton("tutorial-button");
 const tutorialSummary = mustGet("tutorial-summary");
 const dailySeedPreview = mustGet("daily-seed-preview");
@@ -204,6 +201,7 @@ const debugStats = mustGet("debug-stats");
 const toastStack = mustGet("toast-stack");
 const menuTabButtons = Array.from(document.querySelectorAll("[data-menu-tab-button]")) as HTMLButtonElement[];
 const menuTabPanels = Array.from(menu.querySelectorAll("[data-menu-tab]")) as HTMLElement[];
+consolidateSettingsPanels();
 
 const debugControls = {
   enabled: mustGetInput("debug-enabled"),
@@ -271,14 +269,12 @@ renderRunTagFilterUi();
 renderMenuTabs();
 
 playButton.addEventListener("click", () => startRun("endless"));
-campaignButton.addEventListener("click", () => startRun("campaign"));
 resumeButton.addEventListener("click", () => {
   const checkpoint = readCheckpoint();
   if (!checkpoint) return;
-  startRun(checkpoint.mode, checkpoint);
+  startRun(normalizePlayableMode(checkpoint.mode), checkpoint);
 });
 dailyButton.addEventListener("click", () => startRun("daily"));
-bossRushButton.addEventListener("click", () => startRun("boss-rush", null, undefined, 58000));
 tutorialButton.addEventListener("click", () => showTutorial());
 for (const button of menuTabButtons) {
   button.addEventListener("click", () => setMenuTab(button.dataset.menuTabButton || "home"));
@@ -394,12 +390,6 @@ leaderboardModeEndless.addEventListener("click", () => {
 });
 leaderboardModeDaily.addEventListener("click", () => {
   leaderboardMode = "daily";
-  writeLeaderboardMode(leaderboardMode);
-  renderLeaderboardModeButtons();
-  void refreshLeaderboard(leaderboardMode);
-});
-leaderboardModeCampaign.addEventListener("click", () => {
-  leaderboardMode = "campaign";
   writeLeaderboardMode(leaderboardMode);
   renderLeaderboardModeButtons();
   void refreshLeaderboard(leaderboardMode);
@@ -809,6 +799,8 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
   lastRun = null;
   dangerHistory = [];
   hide(menu);
+  menu.style.display = "none";
+  menu.style.pointerEvents = "none";
   hide(gameOver);
   hide(upgradeScreen);
   hide(tutorialScreen);
@@ -844,6 +836,8 @@ async function showMenu() {
   hideHud();
   hideBossHud();
   runPaused = false;
+  menu.style.display = "";
+  menu.style.pointerEvents = "";
   renderMenuTabs();
   show(menu);
   renderProgressionPanel();
@@ -861,6 +855,20 @@ function setMenuTab(tab: string) {
 
 function renderMenuTabs() {
   renderTabsUi(menuTabPanels, menuTabButtons, currentMenuTab);
+}
+
+function consolidateSettingsPanels() {
+  const settingsPanels = menuTabPanels.filter((panel) => panel.dataset.menuTab === "settings");
+  if (settingsPanels.length <= 1) return;
+  const root = settingsPanels[0];
+  for (let i = 1; i < settingsPanels.length; i += 1) {
+    const panel = settingsPanels[i];
+    const section = document.createElement("div");
+    section.className = "mt-6 border-t border-line pt-6";
+    while (panel.firstElementChild) section.append(panel.firstElementChild);
+    root.append(section);
+    panel.remove();
+  }
 }
 
 function chooseUpgrade(id: string) {
@@ -977,7 +985,6 @@ async function refreshLeaderboard(mode: GameMode) {
 function renderLeaderboardModeButtons() {
   leaderboardModeEndless.className = leaderboardMode === "endless" ? "btn-primary px-3 py-2" : "btn-secondary px-3 py-2";
   leaderboardModeDaily.className = leaderboardMode === "daily" ? "btn-primary px-3 py-2" : "btn-secondary px-3 py-2";
-  leaderboardModeCampaign.className = leaderboardMode === "campaign" ? "btn-primary px-3 py-2" : "btn-secondary px-3 py-2";
 }
 
 function renderLeaderboard(result: LeaderboardResult) {
@@ -2152,10 +2159,9 @@ function showToast(message: string, tone: "info" | "success" | "error" = "info")
 function buildReplayLink(run: Pick<RunSummary, "mode" | "seed">) {
   const url = new URL(window.location.href);
   url.searchParams.set("autorun", "1");
-  url.searchParams.set("mode", run.mode);
+  url.searchParams.set("mode", normalizePlayableMode(run.mode));
   url.searchParams.set("seed", run.seed);
   url.searchParams.set("maxMs", "300000");
-  if (run.mode === "boss-rush") url.searchParams.set("startMs", "58000");
   return url.toString();
 }
 
@@ -2164,7 +2170,7 @@ function buildRunLink(run: Pick<RunRecord, "mode" | "seed">) {
 }
 
 function startReplay(run: Pick<RunSummary, "mode" | "seed">) {
-  startRun(run.mode, null, run.seed, run.mode === "boss-rush" ? 58000 : undefined);
+  startRun(normalizePlayableMode(run.mode), null, run.seed);
 }
 
 function formatModeLabel(mode: GameMode): string {
@@ -2390,7 +2396,7 @@ function writeStoredText(key: string, value: string): void {
 function readLeaderboardMode(): GameMode {
   try {
     const raw = localStorage.getItem(LEADERBOARD_MODE_KEY);
-    return raw === "daily" || raw === "campaign" ? raw : "endless";
+    return raw === "daily" ? raw : "endless";
   } catch {
     return "endless";
   }
@@ -2490,7 +2496,7 @@ function mustGetInput(id: string): HTMLInputElement {
 function getAutomationConfig() {
   const active = query.get("autorun") === "1";
   const modeParam = query.get("mode");
-  const mode = modeParam === "daily" || modeParam === "campaign" || modeParam === "boss-rush" ? modeParam : "endless";
+  const mode = modeParam === "daily" ? modeParam : "endless";
   const seed = query.get("seed");
   const startMs = Math.max(0, Number(query.get("startMs") || 0));
   const autoplayer = query.get("autoplayer") === "1" || active;
@@ -2513,6 +2519,10 @@ function getAutomationConfig() {
     startMs,
     runId: query.get("runId") || `${mode}-${seed || Date.now().toString(36)}`,
   };
+}
+
+function normalizePlayableMode(mode: GameMode): GameMode {
+  return mode === "daily" ? "daily" : "endless";
 }
 
 function parseAutoplayerPolicy(raw: string | null): Record<string, number> | null {
