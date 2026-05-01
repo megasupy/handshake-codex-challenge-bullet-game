@@ -13,15 +13,19 @@ const maxMs = Number(process.env.STORM_MAX_MS || 300000);
 const sampleMs = Number(process.env.STORM_SAMPLE_MS || 250);
 const snapshotMs = Number(process.env.STORM_SNAPSHOT_MS || 3000);
 const timeScale = Number(process.env.STORM_TIME_SCALE || 10);
+const mode = process.env.STORM_MODE || "endless";
 const debugBasePort = Number(process.env.STORM_DEBUG_PORT || 9222);
 const startMs = Math.max(0, Number(process.env.STORM_START_MS || 0));
 const seedBase = process.env.STORM_SEED || "";
 const headful = process.env.STORM_HEADFUL === "1";
+const policyRaw = process.env.STORM_POLICY || "";
+const policyFile = process.env.STORM_POLICY_FILE || "";
 const outDir = new URL("../logs/runs/", import.meta.url);
 const summaryDir = new URL("../logs/summary/", import.meta.url);
 
 await mkdir(outDir, { recursive: true });
 await mkdir(summaryDir, { recursive: true });
+const policy = await loadPolicy(policyRaw, policyFile);
 
 const port = await findAvailablePort(basePort);
 process.stdout.write(`using port ${port}\n`);
@@ -49,12 +53,14 @@ try {
     const url = new URL(`http://127.0.0.1:${port}/`);
     url.searchParams.set("autorun", "1");
     url.searchParams.set("autoplayer", "1");
+    url.searchParams.set("mode", mode);
     url.searchParams.set("seed", seed);
     url.searchParams.set("runId", runId);
     url.searchParams.set("sampleMs", String(sampleMs));
     url.searchParams.set("snapshotMs", String(snapshotMs));
     url.searchParams.set("maxMs", String(maxMs));
     url.searchParams.set("timeScale", String(timeScale));
+    if (policy) url.searchParams.set("policy", encodeURIComponent(JSON.stringify(policy)));
     if (startMs > 0) url.searchParams.set("startMs", String(startMs));
 
     const scaledBudgetMs = Math.ceil(maxMs / Math.max(0.1, timeScale));
@@ -84,6 +90,32 @@ try {
   process.stdout.write(`summary ${summaryPath.pathname}\n`);
 } finally {
   server.kill("SIGTERM");
+}
+
+async function loadPolicy(raw, filePath) {
+  if (raw) {
+    try {
+      return normalizePolicyPayload(JSON.parse(raw));
+    } catch {
+      throw new Error("STORM_POLICY is not valid JSON");
+    }
+  }
+  if (filePath) {
+    const content = await readFile(filePath, "utf8");
+    try {
+      return normalizePolicyPayload(JSON.parse(content));
+    } catch {
+      throw new Error(`STORM_POLICY_FILE is not valid JSON: ${filePath}`);
+    }
+  }
+  return null;
+}
+
+function normalizePolicyPayload(parsed) {
+  if (parsed && typeof parsed === "object" && parsed.bestPolicy && typeof parsed.bestPolicy === "object") {
+    return parsed.bestPolicy;
+  }
+  return parsed;
 }
 
 async function findAvailablePort(startPort, attempts = 25) {

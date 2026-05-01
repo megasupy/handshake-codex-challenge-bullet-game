@@ -12,12 +12,20 @@ export type HudPayload = {
   kills: number;
   shotsFired: number;
   shotAccuracy: number;
+  playerDamage: number;
+  playerProjectiles: number;
+  playerFireRate: number;
+  playerPierce: number;
+  playerProjectileSpeed: number;
+  playerDashCooldown: number;
+  maxHealth: number;
 };
 
 export type UpgradeOption = {
   id: string;
   title: string;
   description: string;
+  preview?: string;
 };
 
 export type DebugSettings = {

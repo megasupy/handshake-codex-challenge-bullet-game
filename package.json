@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "telemetry:run": "node scripts/run-autoplayer.mjs",
-    "telemetry:summarize": "node scripts/summarize-telemetry.mjs"
+    "telemetry:summarize": "node scripts/summarize-telemetry.mjs",
+    "telemetry:train": "node scripts/train-autoplayer.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",

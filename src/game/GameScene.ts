@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import type { GameMode, RunSummary } from "../types";
 import { createArenaBackground, createGameTextures } from "./arena";
 import { Autoplayer } from "./autoplayer";
+import type { AutoplayerPolicy } from "./autoplayer";
 import { playSound } from "./audio";
 import { BOSS_RESPAWN_DELAY_MS, Boss1Controller, FIRST_BOSS_AT_MS, SECOND_BOSS_AT_MS, THIRD_BOSS_AT_MS } from "./boss1";
 import { ARENA_HEIGHT, ARENA_WIDTH, DEFAULT_DEBUG_SETTINGS, DEFAULT_PLAYER_STATS, TELEMETRY_SAMPLE_INTERVAL_MS, UPGRADE_INTERVAL_MS } from "./constants";
@@ -14,7 +15,7 @@ import { magnetPickups, restorePickup } from "./pickups";
 import { firePlayerShot, restoreEnemyBullet, restorePlayerShot, updateProjectiles } from "./projectiles";
 import { getVisualPalette } from "./palette";
 import { TelemetryRecorder, toAutoplayerSample, type TelemetryConfig } from "./telemetry";
-import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpgradeOptions, getUpgradeTitle } from "./upgrades";
+import { applyUpgrade as applyUpgradeToStats, chooseAutoplayerUpgrade, chooseUpgradeOptions, formatUpgradePreview, getUpgradeTitle } from "./upgrades";
 import { applyProgression, type ProgressionState } from "../services/progression";
 import { clearCheckpoint, writeCheckpoint, type CheckpointState } from "../services/checkpoint";
 import { readPreferences } from "../services/preferences";
@@ -67,6 +68,7 @@ export class GameScene extends Phaser.Scene {
   private initialProgression: ProgressionState | null = null;
   private resumeCheckpoint: CheckpointState | null = null;
   private keybinds: KeybindState = { ...DEFAULT_KEYBINDS };
+  private autoplayerPolicy: Partial<AutoplayerPolicy> | null = null;
   private playerShotsFired = 0;
   private playerShotsHit = 0;
   private upgradesTaken = 0;
@@ -85,13 +87,14 @@ export class GameScene extends Phaser.Scene {
     super("game");
   }
 
-  init(data: { mode?: GameMode; seed?: string; debugSettings?: Partial<DebugSettings>; telemetryConfig?: Partial<TelemetryConfig>; startMs?: number; progression?: ProgressionState; checkpoint?: CheckpointState; keybinds?: KeybindState }) {
+  init(data: { mode?: GameMode; seed?: string; debugSettings?: Partial<DebugSettings>; telemetryConfig?: Partial<TelemetryConfig>; startMs?: number; progression?: ProgressionState; checkpoint?: CheckpointState; keybinds?: KeybindState; autoplayerPolicy?: Partial<AutoplayerPolicy> | null }) {
     this.mode = data.mode || "endless";
     this.seed = data.checkpoint?.seed || data.seed || Date.now().toString(36);
     this.initialElapsedMs = data.checkpoint?.elapsedMs ?? Math.max(0, Number(data.startMs || 0));
     this.initialProgression = data.checkpoint?.initialProgression || data.progression || null;
     this.resumeCheckpoint = data.checkpoint || null;
     this.keybinds = data.keybinds ? { ...data.keybinds } : { ...DEFAULT_KEYBINDS };
+    this.autoplayerPolicy = data.autoplayerPolicy || null;
     this.inputKeys = {} as Record<string, Phaser.Input.Keyboard.Key>;
     this.debug = mergeDebugSettings({ ...DEFAULT_DEBUG_SETTINGS }, data.debugSettings || {});
     this.telemetryConfig = {
@@ -107,6 +110,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.resetRunState();
     this.rng = new Phaser.Math.RandomDataGenerator([this.seed]);
+    this.autoplayer.setPolicy(this.autoplayerPolicy);
 
     createArenaBackground(this);
     createGameTextures(this);
@@ -411,6 +415,9 @@ export class GameScene extends Phaser.Scene {
       enemyBullets: this.enemyBullets,
       pickups: this.pickups,
       speed,
+      bossActive: Boolean(this.boss),
+      velocityX: this.playerBody.velocity.x,
+      velocityY: this.playerBody.velocity.y,
     });
     const dx = target.x - this.player.x;
     const dy = target.y - this.player.y;
@@ -433,6 +440,7 @@ export class GameScene extends Phaser.Scene {
       enemies: this.enemies,
       enemyBullets: this.enemyBullets,
       dashSpeed,
+      walkSpeed: this.stats.speed,
     });
   }
 
@@ -654,7 +662,10 @@ export class GameScene extends Phaser.Scene {
     this.pausedForUpgrade = true;
     this.manuallyPaused = false;
     this.physics.pause();
-    const options = chooseUpgradeOptions();
+    const options = chooseUpgradeOptions().map((option) => ({
+      ...option,
+      preview: formatUpgradePreview(option.id, this.stats, this.health),
+    }));
     this.pendingUpgradeOptions = options;
     this.telemetry?.logEvent(this.elapsedMs, "upgrade-offered", { options: options.map((option) => option.id).join(",") });
 
@@ -732,6 +743,13 @@ export class GameScene extends Phaser.Scene {
       kills: this.kills,
       shotsFired: this.playerShotsFired,
       shotAccuracy: this.playerShotsFired > 0 ? Math.round((this.playerShotsHit / this.playerShotsFired) * 100) / 100 : 0,
+      playerDamage: this.stats.damage,
+      playerProjectiles: this.stats.projectiles,
+      playerFireRate: this.stats.fireRate,
+      playerPierce: this.stats.pierce,
+      playerProjectileSpeed: this.stats.projectileSpeed,
+      playerDashCooldown: this.stats.dashCooldown,
+      maxHealth: this.stats.maxHealth,
     };
   }
 
@@ -788,6 +806,7 @@ export class GameScene extends Phaser.Scene {
       playerFireRate: this.stats.fireRate,
       playerPierce: this.stats.pierce,
       playerProjectileSpeed: this.stats.projectileSpeed,
+      playerDashCooldown: this.stats.dashCooldown,
       shotsFired: this.playerShotsFired,
       shotsHit: this.playerShotsHit,
       shotAccuracy: this.playerShotsFired > 0 ? Math.round((this.playerShotsHit / this.playerShotsFired) * 100) / 100 : 0,
@@ -836,6 +855,12 @@ export class GameScene extends Phaser.Scene {
         score: summary.score,
         kills: summary.kills,
         maxThreatLevel: summary.maxThreatLevel,
+        bossesDefeated: summary.bossesDefeated ?? 0,
+        campaignLevel: summary.campaignLevel ?? 0,
+        shotAccuracy: summary.shotAccuracy ?? 0,
+        damageTaken: summary.damageTaken ?? 0,
+        damageBurst: summary.damageBurst ?? 0,
+        damageCornered: summary.damageCornered ?? 0,
       });
       emitAutomationComplete({ run });
     } else {

@@ -28,6 +28,7 @@ export type RunSummary = Omit<RunRecord, "id" | "playerName" | "createdAt" | "sy
   playerFireRate?: number;
   playerPierce?: number;
   playerProjectileSpeed?: number;
+  playerDashCooldown?: number;
   shotsFired?: number;
   shotsHit?: number;
   shotAccuracy?: number;

@@ -2,25 +2,71 @@ import Phaser from "phaser";
 import type { UpgradeOption } from "./events";
 import type { PlayerStats } from "./gameTypes";
 
-export const UPGRADE_OPTIONS: UpgradeOption[] = [
-  { id: "speed", title: "Thrusters", description: "+ movement speed" },
-  { id: "rate", title: "Overclock", description: "+ fire rate" },
-  { id: "damage", title: "Hot Rounds", description: "++ projectile damage" },
-  { id: "heavy-damage", title: "Rail Slugs", description: "massive projectile damage" },
-  { id: "projectile", title: "Split Fire", description: "+ projectile count" },
-  { id: "volley", title: "Volley Rig", description: "++ projectile count" },
-  { id: "pierce", title: "Needle Rounds", description: "shots pierce enemies" },
-  { id: "velocity", title: "Accelerator", description: "+ projectile speed" },
-  { id: "overdrive", title: "Overdrive", description: "+ damage, fire rate, speed" },
-  { id: "health", title: "Repair Kit", description: "+ max health and heal 1" },
-  { id: "heal", title: "Patch Job", description: "heal 2" },
-  { id: "range", title: "Collector", description: "+ pickup range" },
-  { id: "wide-range", title: "Vacuum Field", description: "++ pickup range" },
-  { id: "dash", title: "Blink Drive", description: "- dash cooldown" },
+type UpgradeId =
+  | "speed"
+  | "rate"
+  | "damage"
+  | "projectile"
+  | "volley"
+  | "pierce"
+  | "velocity"
+  | "overdrive"
+  | "health"
+  | "heal"
+  | "range"
+  | "wide-range"
+  | "dash";
+
+type UpgradeDef = UpgradeOption & {
+  power: number;
+  primaryStat: "speed" | "fireRate" | "damage" | "projectiles" | "pierce" | "projectileSpeed" | "health" | "heal" | "pickupRange" | "dashCooldown" | "combo";
+};
+
+const UPGRADE_DEFS: UpgradeDef[] = [
+  { id: "speed", title: "Thrusters", description: "+34 move speed", primaryStat: "speed", power: 1 },
+  { id: "rate", title: "Overclock", description: "-50ms fire rate", primaryStat: "fireRate", power: 1 },
+  { id: "damage", title: "Hot Rounds", description: "+2 projectile damage", primaryStat: "damage", power: 1 },
+  { id: "projectile", title: "Split Fire", description: "+1 projectile", primaryStat: "projectiles", power: 1 },
+  { id: "volley", title: "Volley Rig", description: "+2 projectiles", primaryStat: "projectiles", power: 2 },
+  { id: "pierce", title: "Needle Rounds", description: "+1 pierce", primaryStat: "pierce", power: 1 },
+  { id: "velocity", title: "Accelerator", description: "+120 projectile speed", primaryStat: "projectileSpeed", power: 1 },
+  { id: "overdrive", title: "Overdrive", description: "+1 damage, -35ms fire rate, +20 move speed", primaryStat: "combo", power: 1 },
+  { id: "health", title: "Repair Kit", description: "+1 max HP and heal +1", primaryStat: "health", power: 1 },
+  { id: "heal", title: "Patch Job", description: "heal +2 HP", primaryStat: "heal", power: 1 },
+  { id: "range", title: "Collector", description: "+42 pickup range", primaryStat: "pickupRange", power: 1 },
+  { id: "wide-range", title: "Vacuum Field", description: "+90 pickup range", primaryStat: "pickupRange", power: 2 },
+  { id: "dash", title: "Blink Drive", description: "-280ms dash cooldown", primaryStat: "dashCooldown", power: 1 },
 ];
 
+export const UPGRADE_OPTIONS: UpgradeOption[] = UPGRADE_DEFS.map(({ id, title, description }) => ({ id, title, description }));
+
 export function chooseUpgradeOptions(): UpgradeOption[] {
-  return Phaser.Utils.Array.Shuffle([...UPGRADE_OPTIONS]).slice(0, 3);
+  const shuffled = Phaser.Utils.Array.Shuffle([...UPGRADE_DEFS]);
+  const picks: UpgradeDef[] = [];
+  const byStat = new Map<UpgradeDef["primaryStat"], number>();
+
+  for (const candidate of shuffled) {
+    if (picks.length >= 3) break;
+    const existingIndex = byStat.get(candidate.primaryStat);
+    if (existingIndex == null) {
+      byStat.set(candidate.primaryStat, picks.length);
+      picks.push(candidate);
+      continue;
+    }
+    if (candidate.power > picks[existingIndex].power) {
+      picks[existingIndex] = candidate;
+    }
+  }
+
+  if (picks.length < 3) {
+    for (const candidate of shuffled) {
+      if (picks.length >= 3) break;
+      if (picks.some((entry) => entry.id === candidate.id)) continue;
+      picks.push(candidate);
+    }
+  }
+
+  return picks.map(({ id, title, description }) => ({ id, title, description }));
 }
 
 export function chooseAutoplayerUpgrade(options: UpgradeOption[], stats: PlayerStats, health: number): string {
@@ -33,7 +79,23 @@ export function chooseAutoplayerUpgrade(options: UpgradeOption[], stats: PlayerS
 }
 
 export function getUpgradeTitle(id: string): string {
-  return UPGRADE_OPTIONS.find((option) => option.id === id)?.title || id;
+  return UPGRADE_DEFS.find((option) => option.id === id)?.title || id;
+}
+
+export function formatUpgradePreview(id: string, stats: PlayerStats, health: number): string {
+  const before = { ...stats };
+  const applied = applyUpgrade(stats, health, id);
+  const after = applied.stats;
+  const parts: string[] = [];
+  if (after.damage !== before.damage) parts.push(`DMG ${before.damage}->${after.damage}`);
+  if (after.projectiles !== before.projectiles) parts.push(`PRJ ${before.projectiles}->${after.projectiles}`);
+  if (after.fireRate !== before.fireRate) parts.push(`FR ${before.fireRate}ms->${after.fireRate}ms`);
+  if (after.pierce !== before.pierce) parts.push(`PIERCE ${before.pierce}->${after.pierce}`);
+  if (after.maxHealth !== before.maxHealth) parts.push(`MAX HP ${before.maxHealth}->${after.maxHealth}`);
+  if (after.projectileSpeed !== before.projectileSpeed) parts.push(`SPD ${before.projectileSpeed}->${after.projectileSpeed}`);
+  if (after.pickupRange !== before.pickupRange) parts.push(`RANGE ${before.pickupRange}->${after.pickupRange}`);
+  if (applied.health !== health) parts.push(`HP ${health}->${applied.health}`);
+  return parts.join(" · ");
 }
 
 export function applyUpgrade(stats: PlayerStats, health: number, id: string): { stats: PlayerStats; health: number } {
@@ -43,7 +105,6 @@ export function applyUpgrade(stats: PlayerStats, health: number, id: string): { 
   if (id === "speed") next.speed += 34;
   if (id === "rate") next.fireRate = Math.max(80, next.fireRate - 50);
   if (id === "damage") next.damage += 2;
-  if (id === "heavy-damage") next.damage += 4;
   if (id === "projectile") next.projectiles = Math.min(8, next.projectiles + 1);
   if (id === "volley") next.projectiles = Math.min(8, next.projectiles + 2);
   if (id === "pierce") next.pierce = Math.min(4, next.pierce + 1);
@@ -95,7 +156,6 @@ function getAutoplayerUpgradeScore(id: string, stats: PlayerStats, health: numbe
   const needsThroughput = throughput < 6.8 ? 1 : throughput < 9.2 ? 0.55 : 0.15;
   const scores: Record<string, number> = {
     damage: weakness.damage * 1.1 + needsThroughput * 0.18,
-    "heavy-damage": weakness.damage * 0.95 + needsThroughput * 0.2,
     rate: weakness.fireRate + needsThroughput * 0.36,
     projectile: weakness.projectiles + 0.18 + needsThroughput * 0.65,
     volley: weakness.projectiles * 0.92 + 0.2 + needsThroughput * 0.72,

@@ -59,10 +59,7 @@ const bossName = mustGet("boss-name");
 const bossPhase = mustGet("boss-phase");
 const bossPattern = mustGet("boss-pattern");
 const bossHealthFill = mustGet("boss-health-fill");
-const hudKills = mustGet("hud-kills");
-const hudShots = mustGet("hud-shots");
-const hudAccuracy = mustGet("hud-accuracy");
-const hudLevel = mustGet("hud-level");
+const hudHealth = mustGet("hud-health");
 const progressionShards = mustGet("progression-shards");
 const progressionSummary = mustGet("progression-summary");
 const checkpointSummary = mustGet("checkpoint-summary");
@@ -145,25 +142,15 @@ const gameOver = mustGet("game-over");
 const pauseScreen = mustGet("pause-screen");
 const pauseTime = mustGet("pause-time");
 const pauseScore = mustGet("pause-score");
-const pauseThreat = mustGet("pause-threat");
 const pauseHp = mustGet("pause-hp");
 const pauseBoss = mustGet("pause-boss");
-const pauseDangerLabel = mustGet("pause-danger-label");
-const pauseDangerTrace = mustGet("pause-danger-trace");
+const pauseRunSummary = mustGet("pause-run-summary");
 const pauseButton = mustGetButton("pause-button");
 const pauseResume = mustGetButton("pause-resume");
 const pauseRestart = mustGetButton("pause-restart");
 const pauseMenu = mustGetButton("pause-menu");
 const runSummary = mustGet("run-summary");
-const runStyle = mustGet("run-style");
-const runDamage = mustGet("run-damage");
 const runUpgradePath = mustGet("run-upgrade-path");
-const runAdvice = mustGet("run-advice");
-const runBreakdown = mustGet("run-breakdown");
-const runChronologyCount = mustGet("run-chronology-count");
-const runChronology = mustGet("run-chronology");
-const runComparison = mustGet("run-comparison");
-const runSeed = mustGet("run-seed");
 const leaderboardList = mustGet("leaderboard-list");
 const leaderboardSource = mustGet("leaderboard-source");
 const leaderboardModeEndless = mustGetButton("leaderboard-mode-endless");
@@ -205,14 +192,10 @@ const tagStatsCount = mustGet("tag-stats-count");
 const tagStatsSummary = mustGet("tag-stats-summary");
 const tagStatsList = mustGet("tag-stats-list");
 const submitButton = mustGetButton("submit-button");
-const replayButton = mustGetButton("replay-button");
-const copySeedButton = mustGetButton("copy-seed-button");
-const copyLinkButton = mustGetButton("copy-link-button");
-const copyReportButton = mustGetButton("copy-report-button");
-const copyChronologyButton = mustGetButton("copy-chronology-button");
 const restartButton = mustGetButton("restart-button");
 const menuButton = mustGetButton("menu-button");
 const playerNameInput = mustGetInput("player-name");
+const shardsEarned = mustGet("shards-earned");
 const submitStatus = mustGet("submit-status");
 const debugToggle = mustGetButton("debug-toggle");
 const debugClose = mustGetButton("debug-close");
@@ -324,49 +307,6 @@ pauseButton.addEventListener("click", () => togglePause());
 pauseResume.addEventListener("click", () => resumeRun());
 pauseRestart.addEventListener("click", () => startRun(currentMode));
 pauseMenu.addEventListener("click", () => void showMenu());
-replayButton.addEventListener("click", () => {
-  if (!lastRun) return;
-  startReplay(lastRun);
-});
-copySeedButton.addEventListener("click", async () => {
-  if (!lastRun) return;
-  try {
-    await navigator.clipboard.writeText(lastRun.seed);
-    showToast("Seed copied.", "success");
-  } catch {
-    showToast("Seed copy failed.", "error");
-  }
-});
-copyLinkButton.addEventListener("click", async () => {
-  if (!lastRun) return;
-  const link = buildReplayLink(lastRun);
-  try {
-    await navigator.clipboard.writeText(link);
-    showToast("Replay link copied.", "success");
-  } catch {
-    showToast("Replay link copy failed.", "error");
-  }
-});
-copyReportButton.addEventListener("click", async () => {
-  if (!lastRun) return;
-  const report = buildRunReport(lastRun);
-  try {
-    await navigator.clipboard.writeText(report);
-    showToast("Run report copied.", "success");
-  } catch {
-    showToast("Run report copy failed.", "error");
-  }
-});
-copyChronologyButton.addEventListener("click", async () => {
-  if (!lastRun) return;
-  const chronology = buildRunChronology(lastRun);
-  try {
-    await navigator.clipboard.writeText(chronology);
-    showToast("Run chronology copied.", "success");
-  } catch {
-    showToast("Run chronology copy failed.", "error");
-  }
-});
 recentRunsList.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
   const item = target.closest("[data-run-id]") as HTMLElement | null;
@@ -721,19 +661,16 @@ window.addEventListener("keydown", (event) => {
   if (gameOver.classList.contains("hidden")) return;
   if (event.altKey || event.ctrlKey || event.metaKey) return;
   const key = event.key.toLowerCase();
-  if (key === "r" || key === "c" || key === "l") {
+  if (key === "r" || key === "m") {
     const active = document.activeElement;
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
   }
   if (key === "r") {
     event.preventDefault();
-    replayButton.click();
-  } else if (key === "c") {
+    restartButton.click();
+  } else if (key === "m") {
     event.preventDefault();
-    copyReportButton.click();
-  } else if (key === "l") {
-    event.preventDefault();
-    copyLinkButton.click();
+    menuButton.click();
   }
 });
 
@@ -747,12 +684,7 @@ gameEvents.addEventListener("hud", (event) => {
   currentHudState = detail;
   text("hud-time", `${(detail.timeMs / 1000).toFixed(1)}s`);
   text("hud-score", Math.floor(detail.score).toString());
-  text("hud-threat", detail.threat.toString());
-  text("hud-level", detail.level.toString());
-  text("hud-health", detail.health.toString());
-  text("hud-kills", detail.kills.toString());
-  text("hud-shots", detail.shotsFired.toString());
-  text("hud-accuracy", `${Math.round(detail.shotAccuracy * 100)}%`);
+  hudHealth.textContent = detail.health.toString();
   if (runPaused) renderPauseSnapshot();
 });
 
@@ -770,6 +702,7 @@ gameEvents.addEventListener("upgrade", (event) => {
       <span class="mb-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-line bg-slate-950/80 text-xs font-black text-white">${key}</span>
       <strong class="block text-lg text-white">${option.title}</strong>
       <span class="mt-3 block text-sm leading-6 text-slate-300">${option.description}</span>
+      <span class="mt-2 block text-xs leading-5 text-cyan-200/90">${escapeHtml(option.preview || "")}</span>
       <span class="mt-4 block text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Press ${key}</span>
     `;
     button.addEventListener("click", () => chooseUpgrade(option.id));
@@ -781,7 +714,6 @@ gameEvents.addEventListener("upgrade", (event) => {
 
 gameEvents.addEventListener("game-over", (event) => {
   lastRun = (event as CustomEvent<RunSummary>).detail;
-  const previousRecords = currentRecords;
   currentProgression = grantRunReward(lastRun);
   currentRecords = updateRecords(lastRun);
   currentAchievements = updateAchievements(lastRun);
@@ -789,16 +721,9 @@ gameEvents.addEventListener("game-over", (event) => {
   text("final-score", lastRun.score.toLocaleString());
   text("final-time", `${(lastRun.survivalMs / 1000).toFixed(1)}s`);
   text("final-kills", `${lastRun.kills} kills`);
-  text("final-threat", `Threat ${lastRun.maxThreatLevel}`);
-  text("run-seed", lastRun.seed);
   renderRunSummary(lastRun);
-  renderRunStyle(lastRun);
-  renderRunDamage(lastRun);
   renderRunUpgradePath(lastRun);
-  renderRunAdvice(lastRun);
-  renderRunBreakdown(lastRun);
-  renderRunChronology(lastRun);
-  renderRunComparison(lastRun, previousRecords);
+  shardsEarned.textContent = currentProgression.lastReward.toLocaleString();
   submitStatus.textContent = `Progress saved. Gained ${currentProgression.lastReward} shards.`;
   submitButton.disabled = false;
   renderProgressionPanel();
@@ -898,6 +823,7 @@ function startRun(mode: GameMode, checkpoint: ReturnType<typeof readCheckpoint> 
     mode,
     seed: checkpoint?.seed || seedOverride || automationConfig.seed || (mode === "daily" ? dailySeed() : Date.now().toString(36)),
     debugSettings: checkpoint?.debug || getDebugSettingsFromControls(),
+    autoplayerPolicy: automationConfig.policy,
     startMs: startMsOverride ?? automationConfig.startMs,
     telemetryConfig: checkpoint?.telemetryConfig || getTelemetryConfig(),
     progression: currentProgression,
@@ -1771,19 +1697,14 @@ function resumeRun() {
 function renderRunSummary(run: RunSummary) {
   runSummary.innerHTML = "";
   const rows: Record<string, string | number> = {
-    damage: run.playerDamage ?? 1,
+    "sp damage": run.playerDamage ?? 1,
     projectiles: run.playerProjectiles ?? 1,
     fireRate: `${run.playerFireRate ?? 0}ms`,
+    "dash cooldown": `${run.playerDashCooldown ?? 0}ms`,
     pierce: run.playerPierce ?? 0,
-    projectileSpeed: run.playerProjectileSpeed ?? 0,
-    shots: run.shotsFired ?? 0,
-    accuracy: `${((run.shotAccuracy ?? 0) * 100).toFixed(0)}%`,
-    upgrades: run.upgradesTaken ?? 0,
-    bosses: run.bossesDefeated ?? 0,
-    level: run.campaignLevel ?? 1,
-    maxHp: run.maxHealth ?? 0,
-    moveSpeed: run.speed ?? 0,
-    threatPeak: run.finalThreat ?? run.maxThreatLevel,
+    "total XP": run.score ?? 0,
+    "max HP": run.maxHealth ?? 0,
+    "projectile speed": run.playerProjectileSpeed ?? 0,
   };
 
   for (const [label, value] of Object.entries(rows)) {
@@ -1794,98 +1715,23 @@ function renderRunSummary(run: RunSummary) {
   }
 }
 
-function renderRunStyle(run: RunSummary) {
-  const style = describeRunStyle(run);
-  runStyle.textContent = `${style.title} · ${style.note}`;
-}
-
-function renderRunDamage(run: RunSummary) {
-  runDamage.innerHTML = "";
-  const rows: Record<string, string | number> = {
-    total: run.damageTaken ?? 0,
-    attrition: run.damageAttrition ?? 0,
-    burst: run.damageBurst ?? 0,
-    cornered: run.damageCornered ?? 0,
-    boss: run.damageBossContact ?? 0,
-  };
-
-  for (const [label, value] of Object.entries(rows)) {
-    const item = document.createElement("div");
-    item.className = "debug-stat";
-    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
-    runDamage.append(item);
-  }
-}
-
 function renderRunUpgradePath(run: RunSummary) {
   runUpgradePath.innerHTML = "";
   const path = run.upgradePath || [];
   if (path.length === 0) {
     const item = document.createElement("li");
-    item.className = "rounded-full border border-line bg-slate-950/70 px-3 py-2 text-slate-400";
+    item.className = "rounded-md border border-line bg-slate-950/70 px-3 py-2 text-slate-400";
     item.textContent = "No upgrades taken";
     runUpgradePath.append(item);
     return;
   }
-
-  for (const upgrade of path) {
+  const counts = new Map<string, number>();
+  for (const upgrade of path) counts.set(upgrade, (counts.get(upgrade) || 0) + 1);
+  for (const [upgrade, count] of counts.entries()) {
     const item = document.createElement("li");
-    item.className = "rounded-full border border-pulse/40 bg-slate-900/80 px-3 py-2 text-slate-100";
-    item.textContent = upgrade;
+    item.className = "rounded-md border border-pulse/40 bg-slate-900/80 px-3 py-2 text-slate-100";
+    item.textContent = count > 1 ? `${count}x ${upgrade}` : upgrade;
     runUpgradePath.append(item);
-  }
-}
-
-function renderRunAdvice(run: RunSummary) {
-  const advice = getRunAdvice(run);
-  runAdvice.textContent = advice;
-}
-
-function renderRunBreakdown(run: RunSummary) {
-  runBreakdown.innerHTML = "";
-  const breakdown = getBuildBreakdown(run);
-  for (const [label, value] of Object.entries(breakdown)) {
-    const item = document.createElement("div");
-    item.className = "debug-stat";
-    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(value)}</strong>`;
-    runBreakdown.append(item);
-  }
-}
-
-function renderRunChronology(run: RunSummary) {
-  const chronology = run.chronology || [];
-  runChronologyCount.textContent = `${chronology.length} event${chronology.length === 1 ? "" : "s"}`;
-  runChronology.innerHTML = "";
-  if (chronology.length === 0) {
-    const item = document.createElement("li");
-    item.className = "rounded-md border border-line bg-slate-950/70 px-3 py-2 text-slate-400";
-    item.textContent = "No chronology recorded.";
-    runChronology.append(item);
-    return;
-  }
-
-  for (const entry of chronology.slice(-8)) {
-    const item = document.createElement("li");
-    item.className = "rounded-md border border-line bg-slate-950/70 px-3 py-2";
-    item.textContent = entry;
-    runChronology.append(item);
-  }
-}
-
-function renderRunComparison(run: RunSummary, previous: RecordsState) {
-  runComparison.innerHTML = "";
-  const rows: Array<[string, string | number]> = [
-    ["vs survival", formatDelta(run.survivalMs, previous.bestSurvivalMs)],
-    ["vs score", formatDelta(run.score, previous.bestScore)],
-    ["vs kills", formatDelta(run.kills, previous.bestKills)],
-    ["vs threat", formatDelta(run.maxThreatLevel, previous.bestThreat)],
-  ];
-
-  for (const [label, value] of rows) {
-    const item = document.createElement("div");
-    item.className = "debug-stat";
-    item.innerHTML = `<span class=\"block uppercase tracking-wider text-slate-500\">${label}</span><strong class=\"block truncate text-white\">${escapeHtml(String(value))}</strong>`;
-    runComparison.append(item);
   }
 }
 
@@ -1904,27 +1750,33 @@ function renderPauseSnapshot() {
   const hud = currentHudState;
   pauseTime.textContent = hud ? `${(hud.timeMs / 1000).toFixed(1)}s` : "0.0s";
   pauseScore.textContent = hud ? Math.floor(hud.score).toString() : "0";
-  pauseThreat.textContent = hud ? hud.threat.toString() : "1";
   pauseHp.textContent = hud ? hud.health.toString() : "3";
   if (currentBossHudState?.active) {
     pauseBoss.textContent = `${currentBossHudState.name} · Phase ${currentBossHudState.phase} · ${Math.max(0, Math.min(100, Math.round((currentBossHudState.hp / currentBossHudState.maxHp) * 100)))}%`;
   } else {
     pauseBoss.textContent = "none";
   }
-  pauseDangerLabel.textContent = dangerHistory.length > 0 ? dangerHistory[dangerHistory.length - 1].toFixed(1) : "0.0";
-  pauseDangerTrace.innerHTML = "";
-  const max = Math.max(1, ...dangerHistory, 1);
-  for (const value of dangerHistory.slice(-8)) {
-    const bar = document.createElement("span");
-    bar.className = "block rounded-sm bg-pulse/80";
-    bar.style.height = `${Math.max(8, Math.round((value / max) * 100))}%`;
-    pauseDangerTrace.append(bar);
-  }
-  while (pauseDangerTrace.childElementCount < 8) {
-    const bar = document.createElement("span");
-    bar.className = "block rounded-sm bg-slate-800/70";
-    bar.style.height = "8%";
-    pauseDangerTrace.append(bar);
+  renderPauseRunSummary(hud);
+}
+
+function renderPauseRunSummary(hud: HudPayload | null) {
+  pauseRunSummary.innerHTML = "";
+  const rows: Record<string, string | number> = {
+    "sp damage": hud?.playerDamage ?? 1,
+    projectiles: hud?.playerProjectiles ?? 1,
+    fireRate: `${hud?.playerFireRate ?? 0}ms`,
+    "dash cooldown": `${hud?.playerDashCooldown ?? 0}ms`,
+    pierce: hud?.playerPierce ?? 0,
+    "total XP": hud?.score ?? 0,
+    "max HP": hud?.maxHealth ?? 0,
+    "projectile speed": hud?.playerProjectileSpeed ?? 0,
+  };
+
+  for (const [label, value] of Object.entries(rows)) {
+    const item = document.createElement("div");
+    item.className = "debug-stat";
+    item.innerHTML = `<span class="block uppercase tracking-wider text-slate-500">${label}</span><strong class="block truncate text-white">${escapeHtml(String(value))}</strong>`;
+    pauseRunSummary.append(item);
   }
 }
 
@@ -2647,6 +2499,7 @@ function getAutomationConfig() {
   const maxRunMs = Math.max(1000, Number(query.get("maxMs") || 300000));
   const timeScaleParam = query.get("timeScale");
   const timeScale = timeScaleParam ? Math.max(0.1, Math.min(20, Number(timeScaleParam))) : null;
+  const policy = parseAutoplayerPolicy(query.get("policy"));
   return {
     active,
     mode: mode as GameMode,
@@ -2656,9 +2509,25 @@ function getAutomationConfig() {
     snapshotIntervalMs,
     maxRunMs,
     timeScale,
+    policy,
     startMs,
     runId: query.get("runId") || `${mode}-${seed || Date.now().toString(36)}`,
   };
+}
+
+function parseAutoplayerPolicy(raw: string | null): Record<string, number> | null {
+  if (!raw) return null;
+  try {
+    const decoded = decodeURIComponent(raw);
+    const parsed = JSON.parse(decoded) as Record<string, unknown>;
+    const result: Record<string, number> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === "number" && Number.isFinite(value)) result[key] = value;
+    }
+    return result;
+  } catch {
+    return null;
+  }
 }
 
 function publishAutomationResult(run: TelemetryRun, complete: boolean) {
