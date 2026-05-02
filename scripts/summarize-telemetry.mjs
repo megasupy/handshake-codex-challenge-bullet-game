@@ -15,13 +15,17 @@ export async function summarizeRuns(files) {
   const bullets = samples.map((sample) => Number(sample.enemyBullets || 0));
   const pickups = samples.map((sample) => Number(sample.pickups || 0));
   const bossDurations = events.filter((event) => event.type === "boss-defeat").map((event) => Number(event.data?.durationMs || 0));
+  const bossesDefeated = runs.map((run) => Number(run.summary?.bossesDefeated || 0));
   const damageByThreat = aggregateDamageByThreat(events);
   const threatTimeMs = aggregateThreatTime(samples, runs);
 
   return {
     runs: runs.length,
     averageSurvivalMs: average(survival),
+    averageSurvivalSec: average(survival) / 1000,
     medianSurvivalMs: percentile(survival, 0.5),
+    boss1ClearRate: rate(bossesDefeated.map((value) => value >= 1)),
+    boss3ClearRate: rate(bossesDefeated.map((value) => value >= 3)),
     p95FrameMs: percentile(frameMs, 0.95),
     p95EnemyBullets: percentile(bullets, 0.95),
     p95Pickups: percentile(pickups, 0.95),
@@ -93,4 +97,9 @@ function percentile(values, ratio) {
   const sorted = [...values].sort((a, b) => a - b);
   const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(sorted.length * ratio)));
   return sorted[index];
+}
+
+function rate(flags) {
+  if (flags.length === 0) return 0;
+  return flags.filter(Boolean).length / flags.length;
 }

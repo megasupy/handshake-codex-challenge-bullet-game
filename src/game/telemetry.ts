@@ -50,6 +50,16 @@ export type TelemetrySample = {
   bestAlternativeRisk: number;
   riskGap: number;
   incomingDensity: number;
+  corridorContinuity: number;
+  pinchRate: number;
+  flowAlignment: number;
+  postDashReboundRisk: number;
+  dashCorridorLoss: number;
+  minTti: number;
+  collisionVetoCount: number;
+  invalidCandidateCount: number;
+  hitboxMarginPx: number;
+  dashReboundCollisionRisk: number;
   edgeDistance: number;
   reason: string;
   playerDamage: number;
@@ -173,6 +183,16 @@ export class TelemetryRecorder {
       `altRisk=${sample.bestAlternativeRisk}`,
       `riskGap=${sample.riskGap}`,
       `inDensity=${sample.incomingDensity}`,
+      `corr=${sample.corridorContinuity}`,
+      `pinch=${sample.pinchRate}`,
+      `flow=${sample.flowAlignment}`,
+      `dashRebound=${sample.postDashReboundRisk}`,
+      `dashCorrLoss=${sample.dashCorridorLoss}`,
+      `minTti=${sample.minTti}`,
+      `veto=${sample.collisionVetoCount}`,
+      `invalid=${sample.invalidCandidateCount}`,
+      `margin=${sample.hitboxMarginPx}`,
+      `dashReboundCol=${sample.dashReboundCollisionRisk}`,
       `pDmg=${sample.playerDamage}`,
       `pProj=${sample.playerProjectiles}`,
       `pRate=${sample.playerFireRate}`,
@@ -211,6 +231,16 @@ export function toAutoplayerSample(snapshot: AutoplayerTelemetry) {
     bestAlternativeRisk: round(snapshot.bestAlternativeRisk),
     riskGap: round(snapshot.riskGap),
     incomingDensity: snapshot.incomingDensity,
+    corridorContinuity: round(snapshot.corridorContinuity),
+    pinchRate: round(snapshot.pinchRate),
+    flowAlignment: round(snapshot.flowAlignment),
+    postDashReboundRisk: round(snapshot.postDashReboundRisk),
+    dashCorridorLoss: round(snapshot.dashCorridorLoss),
+    minTti: round(snapshot.minTti),
+    collisionVetoCount: Math.floor(snapshot.collisionVetoCount),
+    invalidCandidateCount: Math.floor(snapshot.invalidCandidateCount),
+    hitboxMarginPx: round(snapshot.hitboxMarginPx),
+    dashReboundCollisionRisk: round(snapshot.dashReboundCollisionRisk),
     reason: snapshot.reason,
   };
 }

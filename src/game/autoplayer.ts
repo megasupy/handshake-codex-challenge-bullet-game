@@ -31,6 +31,9 @@ type RolloutResult = {
   safeRays: number;
   corridorWidth: number;
   edgeEntrapment: number;
+  corridorContinuity: number;
+  pinchRate: number;
+  flowAlignment: number;
 };
 
 export type AutoplayerPolicy = {
@@ -60,6 +63,11 @@ export type AutoplayerPolicy = {
   dashRiskThreshold: number;
   dashRiskReductionRequired: number;
   dashImmediateRiskThreshold: number;
+  hitboxMarginPx: number;
+  collisionLookaheadSeconds: number;
+  collisionStepSeconds: number;
+  minTtiPenaltyScale: number;
+  minTtiCriticalSeconds: number;
 };
 
 const DEFAULT_POLICY: AutoplayerPolicy = {
@@ -89,6 +97,11 @@ const DEFAULT_POLICY: AutoplayerPolicy = {
   dashRiskThreshold: 6.4,
   dashRiskReductionRequired: 1.65,
   dashImmediateRiskThreshold: 4.8,
+  hitboxMarginPx: 4.5,
+  collisionLookaheadSeconds: 0.28,
+  collisionStepSeconds: 0.04,
+  minTtiPenaltyScale: 18,
+  minTtiCriticalSeconds: 0.22,
 };
 
 const SAFE_RAY_DIRECTIONS = AUTOPLAYER_DIRECTIONS.filter((direction) => direction.lengthSq() > 0).map((direction) => direction.clone().normalize());
@@ -126,6 +139,16 @@ export class Autoplayer {
     bestAlternativeRisk: 0,
     riskGap: 0,
     incomingDensity: 0,
+    corridorContinuity: 0,
+    pinchRate: 0,
+    flowAlignment: 0,
+    postDashReboundRisk: 0,
+    dashCorridorLoss: 0,
+    minTti: 0,
+    collisionVetoCount: 0,
+    invalidCandidateCount: 0,
+    hitboxMarginPx: DEFAULT_POLICY.hitboxMarginPx,
+    dashReboundCollisionRisk: 0,
   };
 
   reset(): void {
@@ -159,6 +182,16 @@ export class Autoplayer {
       bestAlternativeRisk: 0,
       riskGap: 0,
       incomingDensity: 0,
+      corridorContinuity: 0,
+      pinchRate: 0,
+      flowAlignment: 0,
+      postDashReboundRisk: 0,
+      dashCorridorLoss: 0,
+      minTti: 0,
+      collisionVetoCount: 0,
+      invalidCandidateCount: 0,
+      hitboxMarginPx: this.policy.hitboxMarginPx,
+      dashReboundCollisionRisk: 0,
     };
   }
 
@@ -195,8 +228,21 @@ export class Autoplayer {
     this.updateTacticalState(current, dangerTrend, args.player.x, args.player.y);
 
     const candidates = this.buildCandidateDirections(current);
-    const rollouts = candidates.map((direction) => this.evaluateRollout(direction, args.player, args.speed, args.enemies, args.enemyBullets));
-    rollouts.sort((a, b) => a.score - b.score);
+    const evaluated = candidates.map((direction) => {
+      const rollout = this.evaluateRollout(direction, args.player, args.speed, args.enemies, args.enemyBullets);
+      const veto = this.evaluateCollisionVeto(args.player, direction, args.speed, args.enemyBullets);
+      const criticalPenalty = veto.minTti > 0 && veto.minTti < this.policy.minTtiCriticalSeconds
+        ? (this.policy.minTtiCriticalSeconds - veto.minTti) * this.policy.minTtiPenaltyScale
+        : 0;
+      return {
+        ...rollout,
+        minTti: veto.minTti,
+        hasCollision: veto.hasCollision,
+        score: rollout.score + criticalPenalty,
+      };
+    });
+    const validRollouts = evaluated.filter((entry) => !entry.hasCollision);
+    const rollouts = (validRollouts.length > 0 ? validRollouts : evaluated).sort((a, b) => a.score - b.score);
 
     const best = rollouts[0];
     const second = rollouts[1] ?? best;
@@ -210,7 +256,18 @@ export class Autoplayer {
       this.commitFramesLeft = Math.max(0, Math.round(this.policy.commitFrames));
     }
 
-    if (selected.direction.lengthSq() > 0) this.direction.copy(selected.direction.clone().normalize());
+    const pickupTarget = this.chooseSafePickupTarget(args.player, args.pickups, args.enemies, args.enemyBullets, current);
+    if (pickupTarget && this.shouldBiasToPickup(args.player, pickupTarget, args.enemies, args.enemyBullets, selected)) {
+      const toPickup = new Phaser.Math.Vector2(pickupTarget.x - args.player.x, pickupTarget.y - args.player.y);
+      if (toPickup.lengthSq() > 0.001) {
+        const pickupDir = toPickup.normalize();
+        const blended = selected.direction.lengthSq() > 0
+          ? selected.direction.clone().scale(0.45).add(pickupDir.clone().scale(0.55))
+          : pickupDir;
+        this.direction.copy(blended.normalize());
+      } else if (selected.direction.lengthSq() > 0) this.direction.copy(selected.direction.clone().normalize());
+      else this.direction.set(0, 0);
+    } else if (selected.direction.lengthSq() > 0) this.direction.copy(selected.direction.clone().normalize());
     else this.direction.set(0, 0);
 
     const lookahead = Math.max(this.policy.nearHorizonSeconds, AUTOPLAYER_DECISION_INTERVAL_MS / 1000);
@@ -229,9 +286,9 @@ export class Autoplayer {
       projectedDanger: selected.danger,
       nearestPickupDistance,
       nearestEnemyDistance,
-      pickupTargetX: null,
-      pickupTargetY: null,
-      pickupTargetValue: 0,
+      pickupTargetX: pickupTarget?.x ?? null,
+      pickupTargetY: pickupTarget?.y ?? null,
+      pickupTargetValue: Number(pickupTarget?.getData("value") || 0),
       decisionTimeMs: performance.now() - startedAt,
       lookaheadRisk: selected.score,
       dashCurrentRisk: 0,
@@ -243,6 +300,16 @@ export class Autoplayer {
       bestAlternativeRisk: second.score,
       riskGap: second.score - selected.score,
       incomingDensity: current.density,
+      corridorContinuity: selected.corridorContinuity,
+      pinchRate: selected.pinchRate,
+      flowAlignment: selected.flowAlignment,
+      postDashReboundRisk: this.lastTelemetry.postDashReboundRisk,
+      dashCorridorLoss: this.lastTelemetry.dashCorridorLoss,
+      minTti: selected.minTti,
+      collisionVetoCount: evaluated.filter((entry) => entry.hasCollision).length,
+      invalidCandidateCount: evaluated.length - validRollouts.length,
+      hitboxMarginPx: this.policy.hitboxMarginPx,
+      dashReboundCollisionRisk: this.lastTelemetry.dashReboundCollisionRisk,
     };
 
     this.nextDecisionAt = args.elapsedMs + AUTOPLAYER_DECISION_INTERVAL_MS;
@@ -270,17 +337,34 @@ export class Autoplayer {
 
     const walk = this.evaluateThreatSnapshot(walkX, walkY, this.policy.nearHorizonSeconds, args.player, args.enemies, args.enemyBullets);
     const dash = this.evaluateThreatSnapshot(dashX, dashY, this.policy.nearHorizonSeconds, args.player, args.enemies, args.enemyBullets);
+    const dashRebound = this.evaluateThreatSnapshot(
+      Phaser.Math.Clamp(dashX + args.direction.x * (args.walkSpeed ?? args.dashSpeed * 0.35) * 0.34, 22, ARENA_WIDTH - 22),
+      Phaser.Math.Clamp(dashY + args.direction.y * (args.walkSpeed ?? args.dashSpeed * 0.35) * 0.34, 22, ARENA_HEIGHT - 22),
+      Math.max(this.policy.nearHorizonSeconds, 0.42),
+      args.player,
+      args.enemies,
+      args.enemyBullets,
+    );
 
     const immediateRisk = this.getImmediateInterceptRisk(args.player, args.direction, args.dashSpeed, args.enemyBullets);
     const reduction = walk.danger - dash.danger;
+    const corridorLoss = Math.max(0, walk.corridorWidth - dash.corridorWidth);
+    const reboundRisk = Math.max(0, dashRebound.danger - dash.danger);
+    const dashCollisionRisk = this.getCollisionRiskAt(dashX, dashY, args.enemyBullets, this.getBodyRadius(args.player) + this.policy.hitboxMarginPx);
     const useDash =
       (walk.danger >= this.policy.dashRiskThreshold || immediateRisk >= this.policy.dashImmediateRiskThreshold)
-      && reduction >= this.policy.dashRiskReductionRequired;
+      && reduction >= this.policy.dashRiskReductionRequired
+      && corridorLoss < 65
+      && reboundRisk < 1.35
+      && dashCollisionRisk < 0.5;
 
     this.lastTelemetry.dashCurrentRisk = current.danger;
     this.lastTelemetry.dashProjectedRisk = dash.danger;
     this.lastTelemetry.dashImmediateRisk = immediateRisk;
     this.lastTelemetry.dashWouldUse = useDash;
+    this.lastTelemetry.postDashReboundRisk = reboundRisk;
+    this.lastTelemetry.dashCorridorLoss = corridorLoss;
+    this.lastTelemetry.dashReboundCollisionRisk = dashCollisionRisk;
 
     return useDash;
   }
@@ -352,6 +436,11 @@ export class Autoplayer {
     let minCorridorWidth = Number.POSITIVE_INFINITY;
     let maxEdgeEntrapment = 0;
     let lastDanger = 0;
+    let lastCorridorWidth = Number.POSITIVE_INFINITY;
+    let corridorContinuity = 0;
+    let pinchRate = 0;
+    let flowAlignment = 0;
+    let flowSamples = 0;
 
     for (let step = 1; step <= steps; step += 1) {
       x = Phaser.Math.Clamp(x + direction.x * speed * dt, 22, ARENA_WIDTH - 22);
@@ -367,7 +456,22 @@ export class Autoplayer {
       score += Math.max(0, 165 - threat.corridorWidth) * 0.02 * this.policy.corridorCollapseWeight * w;
       score -= threat.safeRays * this.policy.escapeOptionWeight * 0.12 * w;
       if (step >= 2) score += Math.max(0, threat.danger - lastDanger) * this.policy.approachWeight * 0.35;
+      if (Number.isFinite(lastCorridorWidth)) {
+        const pinch = Math.max(0, lastCorridorWidth - threat.corridorWidth);
+        pinchRate = Math.max(pinchRate, pinch);
+        corridorContinuity += Math.max(0, 1 - pinch / 58);
+        score += pinch * 0.03;
+      }
+      const tangent = new Phaser.Math.Vector2(-threat.gradientY, threat.gradientX);
+      if (tangent.lengthSq() > 0.0001 && direction.lengthSq() > 0) {
+        const tangentNorm = tangent.normalize();
+        const align = Math.abs(direction.dot(tangentNorm));
+        flowAlignment += align;
+        flowSamples += 1;
+        if (threat.danger > 4.2) score -= align * 0.45;
+      }
       lastDanger = threat.danger;
+      lastCorridorWidth = threat.corridorWidth;
 
       minSafeRays = Math.min(minSafeRays, threat.safeRays);
       minCorridorWidth = Math.min(minCorridorWidth, threat.corridorWidth);
@@ -392,6 +496,9 @@ export class Autoplayer {
       safeRays: minSafeRays,
       corridorWidth: minCorridorWidth,
       edgeEntrapment: maxEdgeEntrapment,
+      corridorContinuity: flowSamples > 0 ? corridorContinuity / flowSamples : 0,
+      pinchRate,
+      flowAlignment: flowSamples > 0 ? flowAlignment / flowSamples : 0,
     };
   }
 
@@ -458,10 +565,11 @@ export class Autoplayer {
       const px = bullet.x + vx * horizonSeconds;
       const py = bullet.y + vy * horizonSeconds;
       const approach = this.getApproachWeight(px, py, vx, vy, player.x, player.y);
+      const bulletRadius = this.getBodyRadius(bullet);
       threats.push({
         x: px,
         y: py,
-        radius: PLAYER_RADIUS + 18,
+        radius: PLAYER_RADIUS + bulletRadius + this.policy.hitboxMarginPx,
         weight: 2.9,
         approachWeight: approach,
       });
@@ -477,10 +585,11 @@ export class Autoplayer {
       const vy = hasVelocity ? body!.velocity.y : Math.sin(Phaser.Math.Angle.Between(enemy.x, enemy.y, player.x, player.y)) * data.speed;
       const px = enemy.x + vx * horizonSeconds;
       const py = enemy.y + vy * horizonSeconds;
+      const enemyRadius = this.getBodyRadius(enemy);
       threats.push({
         x: px,
         y: py,
-        radius: PLAYER_RADIUS + (data.kind === "chaser" ? 30 : 24),
+        radius: PLAYER_RADIUS + enemyRadius + this.policy.hitboxMarginPx,
         weight: data.kind === "chaser" ? 2.2 : 1.5,
         approachWeight: this.getApproachWeight(px, py, vx, vy, player.x, player.y),
       });
@@ -546,6 +655,7 @@ export class Autoplayer {
     enemyBullets: Phaser.Physics.Arcade.Group,
   ): number {
     let risk = 0;
+    const playerRadius = this.getBodyRadius(player) + this.policy.hitboxMarginPx;
     const moveVx = direction.x * speed;
     const moveVy = direction.y * speed;
     const entries = enemyBullets.children.entries as Phaser.Physics.Arcade.Image[];
@@ -566,11 +676,84 @@ export class Autoplayer {
       const px = player.x + moveVx * t;
       const py = player.y + moveVy * t;
       const dist = Phaser.Math.Distance.Between(px, py, cx, cy);
-      if (dist < 24) risk += 7;
-      else if (dist < 48) risk += (48 - dist) / 7;
+      const threshold = playerRadius + this.getBodyRadius(bullet);
+      if (dist < threshold) risk += 7 + (threshold - dist) * 0.3;
+      else if (dist < threshold + 26) risk += (threshold + 26 - dist) / 7;
     }
 
     return risk;
+  }
+
+  private evaluateCollisionVeto(
+    player: Phaser.GameObjects.Shape,
+    direction: Phaser.Math.Vector2,
+    speed: number,
+    enemyBullets: Phaser.Physics.Arcade.Group,
+  ): { hasCollision: boolean; minTti: number } {
+    if (direction.lengthSq() === 0) return { hasCollision: false, minTti: Number.POSITIVE_INFINITY };
+    const moveVx = direction.x * speed;
+    const moveVy = direction.y * speed;
+    const lookahead = this.policy.collisionLookaheadSeconds;
+    const step = this.policy.collisionStepSeconds;
+    let minTti = Number.POSITIVE_INFINITY;
+    let hasCollision = false;
+    const playerRadius = this.getBodyRadius(player) + this.policy.hitboxMarginPx;
+    const entries = enemyBullets.children.entries as Phaser.Physics.Arcade.Image[];
+    for (let t = step; t <= lookahead; t += step) {
+      const px = player.x + moveVx * t;
+      const py = player.y + moveVy * t;
+      if (px < 22 || px > ARENA_WIDTH - 22 || py < 22 || py > ARENA_HEIGHT - 22) {
+        hasCollision = true;
+        minTti = Math.min(minTti, t);
+        break;
+      }
+      for (let i = 0; i < entries.length; i += 1) {
+        const bullet = entries[i];
+        if (!bullet?.active) continue;
+        const body = bullet.body as Phaser.Physics.Arcade.Body | undefined;
+        if (!body) continue;
+        const bx = bullet.x + body.velocity.x * t;
+        const by = bullet.y + body.velocity.y * t;
+        const threshold = playerRadius + this.getBodyRadius(bullet);
+        if (Phaser.Math.Distance.Between(px, py, bx, by) < threshold) {
+          hasCollision = true;
+          minTti = Math.min(minTti, t);
+          break;
+        }
+      }
+      if (hasCollision) break;
+    }
+    return { hasCollision, minTti };
+  }
+
+  private getCollisionRiskAt(x: number, y: number, enemyBullets: Phaser.Physics.Arcade.Group, threshold: number): number {
+    const entries = enemyBullets.children.entries as Phaser.Physics.Arcade.Image[];
+    let risk = 0;
+    for (let i = 0; i < entries.length; i += 1) {
+      const bullet = entries[i];
+      if (!bullet?.active) continue;
+      const body = bullet.body as Phaser.Physics.Arcade.Body | undefined;
+      if (!body) continue;
+      const d = Phaser.Math.Distance.Between(x, y, bullet.x, bullet.y);
+      const sep = threshold + this.getBodyRadius(bullet);
+      if (d < sep) risk += 1 + (sep - d) * 0.12;
+    }
+    return risk;
+  }
+
+  private getBodyRadius(entity: { body?: unknown; width?: number; height?: number }): number {
+    const body = entity.body as { halfWidth?: number; halfHeight?: number; width?: number; height?: number; isCircle?: boolean } | null | undefined;
+    if (body) {
+      const width = Number(body.width) || 0;
+      const height = Number(body.height) || 0;
+      const halfW = Number.isFinite(body.halfWidth) ? Number(body.halfWidth) : width * 0.5;
+      const halfH = Number.isFinite(body.halfHeight) ? Number(body.halfHeight) : height * 0.5;
+      if (body.isCircle && Number.isFinite(body.halfWidth)) return Number(body.halfWidth);
+      if (Number.isFinite(halfW) && Number.isFinite(halfH)) return Math.max(halfW, halfH);
+    }
+    const fallbackW = Number(entity.width) || PLAYER_RADIUS * 2;
+    const fallbackH = Number(entity.height) || PLAYER_RADIUS * 2;
+    return Math.max(fallbackW, fallbackH) * 0.5;
   }
 
   private getNearestEnemyDistance(x: number, y: number, enemies: Phaser.Physics.Arcade.Group): number {
@@ -595,5 +778,54 @@ export class Autoplayer {
       if (distance < best) best = distance;
     }
     return best;
+  }
+
+  private chooseSafePickupTarget(
+    player: Phaser.GameObjects.Shape,
+    pickups: Phaser.Physics.Arcade.Group,
+    enemies: Phaser.Physics.Arcade.Group,
+    enemyBullets: Phaser.Physics.Arcade.Group,
+    current: ThreatSnapshot,
+  ): Phaser.Physics.Arcade.Image | null {
+    if (current.danger > 4.1 || current.safeRays < 5 || current.corridorWidth < 138) return null;
+    let best: Phaser.Physics.Arcade.Image | null = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    const entries = pickups.children.entries as Phaser.Physics.Arcade.Image[];
+    for (let i = 0; i < entries.length; i += 1) {
+      const pickup = entries[i];
+      if (!pickup?.active) continue;
+      const distance = Phaser.Math.Distance.Between(player.x, player.y, pickup.x, pickup.y);
+      if (distance > 260) continue;
+      const pickupThreat = this.evaluateThreatSnapshot(pickup.x, pickup.y, this.policy.nearHorizonSeconds, player, enemies, enemyBullets);
+      if (pickupThreat.danger > 4.4 || pickupThreat.safeRays < 4) continue;
+      const value = Number(pickup.getData("value") || 1);
+      const score = distance + pickupThreat.danger * 24 - value * 28;
+      if (score < bestScore) {
+        bestScore = score;
+        best = pickup;
+      }
+    }
+    return best;
+  }
+
+  private shouldBiasToPickup(
+    player: Phaser.GameObjects.Shape,
+    pickup: Phaser.Physics.Arcade.Image,
+    enemies: Phaser.Physics.Arcade.Group,
+    enemyBullets: Phaser.Physics.Arcade.Group,
+    selected: RolloutResult,
+  ): boolean {
+    const samples = 5;
+    let worstDanger = 0;
+    for (let i = 1; i <= samples; i += 1) {
+      const t = i / samples;
+      const x = Phaser.Math.Linear(player.x, pickup.x, t);
+      const y = Phaser.Math.Linear(player.y, pickup.y, t);
+      const threat = this.evaluateThreatSnapshot(x, y, this.policy.nearHorizonSeconds, player, enemies, enemyBullets);
+      worstDanger = Math.max(worstDanger, threat.danger);
+      if (threat.danger > selected.danger + 0.85) return false;
+      if (threat.safeRays <= 2) return false;
+    }
+    return worstDanger <= 5.2;
   }
 }

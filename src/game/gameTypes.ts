@@ -42,4 +42,14 @@ export type AutoplayerTelemetry = {
   bestAlternativeRisk: number;
   riskGap: number;
   incomingDensity: number;
+  corridorContinuity: number;
+  pinchRate: number;
+  flowAlignment: number;
+  postDashReboundRisk: number;
+  dashCorridorLoss: number;
+  minTti: number;
+  collisionVetoCount: number;
+  invalidCandidateCount: number;
+  hitboxMarginPx: number;
+  dashReboundCollisionRisk: number;
 };
